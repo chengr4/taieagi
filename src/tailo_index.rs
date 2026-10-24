@@ -548,7 +548,7 @@ mod tests {
         ]);
         let mut idx = TailoIndex::default();
         idx.load_hints_compact(&bytes);
-        assert_eq!(idx.lookup_hints("jire"), &[cand.clone()]);
+        assert_eq!(idx.lookup_hints("jire"), std::slice::from_ref(&cand));
         assert_eq!(idx.lookup_hints("jile"), &[cand]);
     }
 

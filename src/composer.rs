@@ -5,6 +5,7 @@ use crate::tone::{Tone, apply_tone};
 
 /// Formatting mode applied to committed candidates.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[allow(clippy::enum_variant_names)]
 pub(crate) enum OutputMode {
     /// Pure Hanzi (default), e.g. "水" / "啉水".
     #[default]

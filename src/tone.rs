@@ -177,11 +177,11 @@ pub(crate) fn apply_tone(syllable: &str, tone: Tone) -> String {
 /// If the trailing character is not a valid tone digit, `(input, None)` is returned.
 /// This operation is zero-copy and borrows directly from the input string slice.
 pub(crate) fn split_syllable_and_tone(input: &str) -> (&str, Option<Tone>) {
-    if let Some(last_char) = input.chars().next_back() {
-        if let Some(tone) = Tone::from_char(last_char) {
-            let prefix_len = input.len() - last_char.len_utf8();
-            return (&input[..prefix_len], Some(tone));
-        }
+    if let Some(last_char) = input.chars().next_back()
+        && let Some(tone) = Tone::from_char(last_char)
+    {
+        let prefix_len = input.len() - last_char.len_utf8();
+        return (&input[..prefix_len], Some(tone));
     }
     (input, None)
 }
@@ -402,7 +402,7 @@ pub fn parse_tailo_word(word: &str) -> (String, Vec<Tone>) {
     let normalized = word.replace("--", "-");
 
     // Split on hyphens or spaces
-    for part in normalized.split(|c| c == '-' || c == ' ') {
+    for part in normalized.split(['-', ' ']) {
         let trimmed = part.trim();
         if trimmed.is_empty() {
             continue;

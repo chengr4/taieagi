@@ -1,7 +1,7 @@
 //! WebAssembly bindings for [`Composer`].
 
 use crate::composer::{Composer, EditOutcome, OutputMode, format_commit};
-use wasm_bindgen::prelude::*;
+use wasm_bindgen::prelude::wasm_bindgen;
 
 /// WebAssembly-exported state machine for Taiwanese Romanization input.
 #[wasm_bindgen]
