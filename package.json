@@ -11,6 +11,7 @@
   },
   "scripts": {
     "build": "bun run scripts/build.ts",
+    "bump": "bun run scripts/bump.ts",
     "test:unit": "bun test extension/src/*.test.ts",
     "test:wasm": "bun run scripts/test-wasm.ts",
     "test": "bun run test:unit && bun run test:wasm"

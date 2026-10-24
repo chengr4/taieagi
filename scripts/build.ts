@@ -63,4 +63,16 @@ for (const file of [
   }
 }
 
+// Synchronize version from package.json into extension/manifest.json
+const pkg = await Bun.file("package.json").json();
+const manifestPath = "extension/manifest.json";
+if (await Bun.file(manifestPath).exists()) {
+  const manifest = await Bun.file(manifestPath).json();
+  if (manifest.version !== pkg.version) {
+    manifest.version = pkg.version;
+    await Bun.write(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+    console.log(`📌 Synced manifest.json version to ${pkg.version}`);
+  }
+}
+
 console.log("✨ Build succeeded! Extension ready in ./extension");

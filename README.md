@@ -9,10 +9,10 @@ A lightweight, efficient Chrome extension providing a 26-key Quick Palette for T
 **Taieagi** 致力於為臺灣所有非華語之本土語言（臺灣閩南語、臺灣客語、臺灣原住民族各語）打造統一、現代且零干擾的 26 鍵輸入體驗。核心場景鎖定於社交平台（Threads、Facebook、Dcard、X 等）留言或即時通訊中快速鍵入正字與標調拼音。
 
 * 平常不攔截任何全域鍵盤事件；使用者按下非列印快捷鍵（macOS 預設 `Option + T`、其他平台預設 `Alt + T`）或點擊留言框右邊徽章時，隨即於游標旁彈出輕量選字視窗，鍵入拼音選字完成後自動寫入網頁並閉合。
-* 目前僅實作臺灣閩南語。
+* **目前僅實作臺灣閩南語**。
 * **希望擴充支援臺灣其他本土語言**，並支援前端即時切換偏好語言。
 
-> 還希望可以支援寫入台灣閩南語歌詞，歡迎大家貢獻 🥹。
+> 還希望可以支援產生台灣閩南語歌詞，歡迎大家貢獻 🥹。
 
 **Taieagi** is dedicated to providing a unified, modern, and zero-interference 26-key typing experience for all Taiwanese indigenous and native languages (Taiwanese Hokkien, Hakka, and Indigenous languages). The primary focus is enabling rapid insertion of native orthography and tonal romanization in social media comments (Threads, Facebook, Dcard, X) and instant messaging.
 
@@ -76,7 +76,7 @@ The lexicon and standard pronunciations in this project rely on and acknowledge 
 * **日常補充詞庫**（[`assets/supplement.csv`](assets/supplement.csv)）：
   * 格式：`詞目,音讀`（範例：`這个,tsit ê`）。
   * 適用於日常高頻但教育部未獨立列目之詞彙；提交前請嚴格確認發音與臺羅標調。
-* **經典台語歌詞**（[`assets/lyrics.csv`](assets/lyrics.csv)）：
+* **台灣閩南語歌詞**（[`assets/lyrics.csv`](assets/lyrics.csv)）：
   * 格式：`詞目,音讀`（範例：`我合你上好就到遮,guá kap lí siōng-hó tiō kàu tsia`）。
   * 適用於知名台語歌曲之標準用字歌詞，便於社群留言時快速輸入整句。
 * **口語誤拼正音提示**（[`assets/hints.csv`](assets/hints.csv) 與 [`assets/lyrics_hints.csv`](assets/lyrics_hints.csv)）：
@@ -90,7 +90,7 @@ If you encounter missing vocabulary, classic lyrics, or common phonetic misspell
 * **Everyday Supplement Lexicon** ([`assets/supplement.csv`](assets/supplement.csv)):
   * Format: `headword,romanization` (e.g. `這个,tsit ê`).
   * For frequent colloquial words not individually cataloged by the MOE dictionary; please verify standard Tâi-lô romanization and tone diacritics before submitting.
-* **Classic Taiwanese Lyrics** ([`assets/lyrics.csv`](assets/lyrics.csv)):
+* **Taiwanese Hokkien Lyrics** ([`assets/lyrics.csv`](assets/lyrics.csv)):
   * Format: `headword,romanization` (e.g. `我合你上好就到遮,guá kap lí siōng-hó tiō kàu tsia` from Mayday's *Peter & Mary*).
   * Standard orthography lyrics of well-known Taiwanese songs for quick lyric phrase typing in social threads.
 * **Colloquial Typo & Orthography Hints** ([`assets/hints.csv`](assets/hints.csv) & [`assets/lyrics_hints.csv`](assets/lyrics_hints.csv)):
