@@ -1,11 +1,21 @@
 {
   "manifest_version": 3,
-  "name": "Taieagi 台灣閩南語快彈輸入法",
+  "name": "Taieagi 臺灣本土語言快彈詞盤",
   "version": "0.1.0",
   "author": "R4 Cheng",
-  "description": "社群留言台灣閩南語正字快彈輸入器 (臺羅拼音輸入)。",
+  "description": "社群留言臺灣本土語言正字快彈詞盤（現已支援臺灣閩南語臺羅拼音輸入）。",
   "action": {
-    "default_title": "Taieagi 台灣閩南語快彈輸入法"
+    "default_title": "Taieagi 臺灣本土語言快彈詞盤",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
   },
   "permissions": [
     "storage"
@@ -23,7 +33,7 @@
         "default": "Alt+T",
         "mac": "Option+T"
       },
-      "description": "喚起 / 關閉台灣閩南語快彈輸入器"
+      "description": "喚起 / 關閉臺灣本土語言快彈詞盤"
     }
   },
   "content_scripts": [

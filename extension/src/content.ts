@@ -25,7 +25,7 @@ class ExtensionController {
     badge.id = "taieagi-badge";
     badge.className = "taieagi-badge";
     badge.textContent = "台閩";
-    badge.title = "喚起台灣閩南語快彈輸入法 (Alt+T / Option+T)";
+    badge.title = "喚起臺灣本土語言快彈詞盤 (Alt+T / Option+T)";
     badge.style.display = "none";
 
     badge.addEventListener("mousedown", (e) => {
