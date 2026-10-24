@@ -1,0 +1,18 @@
+{
+  "name": "taieagi",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "author": "R4 Cheng <karaburi2023@gmail.com>",
+  "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chengr4/taieagi.git"
+  },
+  "scripts": {
+    "build": "bun run scripts/build.ts",
+    "test:unit": "bun test extension/src/*.test.ts",
+    "test:wasm": "bun run scripts/test-wasm.ts",
+    "test": "bun run test:unit && bun run test:wasm"
+  }
+}
