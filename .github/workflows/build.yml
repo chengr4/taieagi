@@ -1,0 +1,63 @@
+name: Build & Test Extension
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build & Verify
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: stable
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-bindgen-cli
+        uses: taiki-e/install-action@f87f9990b09867202953bff9aa0c80e23ee16bb7 # v2.49.18
+        with:
+          tool: wasm-bindgen-cli@0.2.129
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.1
+        with:
+          bun-version: "1.4.4"
+
+      - name: Verify dictionary compilation
+        run: cargo run --bin prepare_dict
+
+      - name: Run pure Rust unit tests
+        run: cargo test --quiet
+
+      - name: Build extension distribution
+        run: bun run build
+
+      - name: Run frontend unit & WASM integration tests
+        run: bun run test
+
+      - name: Archive extension artifact
+        run: |
+          cd extension
+          zip -r ../taieagi-extension.zip . -x "src/*"
+
+      - name: Upload extension artifact
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: taieagi-extension
+          path: taieagi-extension.zip
+          retention-days: 14
