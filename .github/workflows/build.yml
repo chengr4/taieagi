@@ -38,6 +38,9 @@ jobs:
         with:
           bun-version: "1.4.4"
 
+      - name: Check dictionary CSV ordering
+        run: bun run dict:check
+
       - name: Verify dictionary compilation
         run: cargo run --bin prepare_dict
 

@@ -13,6 +13,8 @@
     "build": "bun run scripts/build.ts",
     "pack": "bun run build && (cd extension && rm -f ../taieagi-extension.zip && zip -r ../taieagi-extension.zip . -x 'src/*')",
     "bump": "bun run scripts/bump.ts",
+    "dict:check": "bun run scripts/check-dict.ts",
+    "dict:sort": "bun run scripts/check-dict.ts --write",
     "test:unit": "bun test extension/src/*.test.ts",
     "test:wasm": "bun run scripts/test-wasm.ts",
     "test": "bun run test:unit && bun run test:wasm"
