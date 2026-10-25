@@ -24,9 +24,18 @@ pub struct LexiconEntry {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Candidate {
     pub hanzi: String,
-    pub weight: u32,
     pub tailo: String,
     pub tones: Vec<Tone>,
+}
+
+impl From<&LexiconEntry> for Candidate {
+    fn from(entry: &LexiconEntry) -> Self {
+        Self {
+            hanzi: entry.hanzi.clone(),
+            tailo: entry.tailo.clone(),
+            tones: entry.tones.clone(),
+        }
+    }
 }
 
 #[derive(Default)]
@@ -174,12 +183,7 @@ impl TailoIndex {
         matched
             .into_iter()
             .filter(|(e, _)| seen_hanzi.insert(e.hanzi.as_str()))
-            .map(|(e, _)| Candidate {
-                hanzi: e.hanzi.clone(),
-                weight: e.weight,
-                tailo: e.tailo.clone(),
-                tones: e.tones.clone(),
-            })
+            .map(|(e, _)| Candidate::from(e))
             .collect()
     }
 
@@ -388,7 +392,6 @@ fn decode_hints_compact(bytes: &[u8]) -> Vec<(String, Candidate)> {
             typo,
             Candidate {
                 hanzi,
-                weight: 0,
                 tailo,
                 tones,
             },
@@ -440,7 +443,6 @@ mod tests {
 
         let cands = idx.lookup("tsui");
         assert_eq!(hanzi_of(&cands), vec!["水", "水井"]);
-        assert_eq!(cands[1].weight, 8);
         assert_eq!(cands[1].tailo, "tsui-tsenn");
     }
 
@@ -520,7 +522,6 @@ mod tests {
         let mut idx = TailoIndex::default();
         let cand = |hanzi: &str, tailo: &str, tones: &[Tone]| Candidate {
             hanzi: hanzi.to_string(),
-            weight: 0,
             tailo: tailo.to_string(),
             tones: tones.to_vec(),
         };
@@ -538,7 +539,6 @@ mod tests {
     fn test_hints_compact_binary_roundtrip() {
         let cand = Candidate {
             hanzi: "這个".to_string(),
-            weight: 0,
             tailo: "tsit-e".to_string(),
             tones: vec![Tone::Tone4, Tone::Tone5],
         };

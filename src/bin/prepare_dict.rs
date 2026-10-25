@@ -314,7 +314,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             let candidate = Candidate {
                 hanzi: hanzi.to_string(),
-                weight: 0,
                 tailo: plain_tailo,
                 tones,
             };

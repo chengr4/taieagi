@@ -350,7 +350,6 @@ mod tests {
     fn test_format_commit_hanzi_only() {
         let single = Candidate {
             hanzi: "水".to_string(),
-            weight: 9,
             tailo: "tsui".to_string(),
             tones: vec![Tone::Tone2],
         };
@@ -358,7 +357,6 @@ mod tests {
 
         let compound = Candidate {
             hanzi: "啉水".to_string(),
-            weight: 10,
             tailo: "lim-tsui".to_string(),
             tones: vec![Tone::Tone1, Tone::Tone2],
         };
@@ -369,7 +367,6 @@ mod tests {
     fn test_format_commit_with_number() {
         let single = Candidate {
             hanzi: "水".to_string(),
-            weight: 9,
             tailo: "tsui".to_string(),
             tones: vec![Tone::Tone2],
         };
@@ -380,7 +377,6 @@ mod tests {
 
         let compound = Candidate {
             hanzi: "啉水".to_string(),
-            weight: 10,
             tailo: "lim-tsui".to_string(),
             tones: vec![Tone::Tone1, Tone::Tone2],
         };
@@ -393,7 +389,6 @@ mod tests {
         // Also supports whitespace-separated lexicon data
         let space_compound = Candidate {
             hanzi: "啉水".to_string(),
-            weight: 10,
             tailo: "lim tsui".to_string(),
             tones: vec![Tone::Tone1, Tone::Tone2],
         };
@@ -407,7 +402,6 @@ mod tests {
     fn test_format_commit_with_marks() {
         let single = Candidate {
             hanzi: "水".to_string(),
-            weight: 9,
             tailo: "tsui".to_string(),
             tones: vec![Tone::Tone2],
         };
@@ -419,7 +413,6 @@ mod tests {
 
         let compound = Candidate {
             hanzi: "啉水".to_string(),
-            weight: 10,
             tailo: "lim-tsui".to_string(),
             tones: vec![Tone::Tone1, Tone::Tone2],
         };
@@ -434,7 +427,6 @@ mod tests {
     fn test_format_commit_fallbacks_to_pure_hanzi() {
         let empty_tones = Candidate {
             hanzi: "水".to_string(),
-            weight: 9,
             tailo: "tsui".to_string(),
             tones: vec![],
         };
@@ -449,7 +441,6 @@ mod tests {
 
         let mismatch = Candidate {
             hanzi: "啉水".to_string(),
-            weight: 10,
             tailo: "lim-tsui".to_string(),
             tones: vec![Tone::Tone1], // Expected 2, got 1
         };
@@ -460,7 +451,6 @@ mod tests {
 
         let empty_tailo = Candidate {
             hanzi: "水".to_string(),
-            weight: 9,
             tailo: "".to_string(),
             tones: vec![Tone::Tone2],
         };
@@ -499,7 +489,6 @@ mod tests {
             "jire",
             Candidate {
                 hanzi: "這个".to_string(),
-                weight: 0,
                 tailo: "tsit-e".to_string(),
                 tones: vec![Tone::Tone4, Tone::Tone5],
             },
@@ -508,7 +497,6 @@ mod tests {
             "aikun",
             Candidate {
                 hanzi: "愛睏".to_string(),
-                weight: 0,
                 tailo: "ai-khun".to_string(),
                 tones: vec![Tone::Tone3, Tone::Tone3],
             },
