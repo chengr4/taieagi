@@ -1,3 +1,4 @@
+import type { ImeState } from "./background";
 import { insertTextIntoTarget } from "./dom";
 
 export enum OutputMode {
@@ -22,19 +23,22 @@ export interface ComposerBridge {
 }
 
 export class BackgroundBridge implements ComposerBridge {
-  private state = {
+  private session: ImeState = {
     preedit: "",
-    candidates: [] as string[],
+    candidates: [],
     selected: 0,
-    hints: [] as string[],
-    outputMode: OutputMode.HanziOnly,
+    hints: [],
   };
+  private currentMode: OutputMode = OutputMode.HanziOnly;
 
   public async init(onStateChange?: () => void): Promise<void> {
     if (typeof chrome !== "undefined" && chrome?.runtime?.sendMessage) {
       const res = await chrome.runtime.sendMessage({ type: "INIT" });
       if (res?.ok) {
-        this.updateState(res);
+        this.updateSession(res);
+        if (typeof res.outputMode === "number") {
+          this.currentMode = res.outputMode as OutputMode;
+        }
       }
     }
     if (typeof chrome !== "undefined" && chrome?.storage?.onChanged) {
@@ -42,7 +46,7 @@ export class BackgroundBridge implements ComposerBridge {
         if (areaName === "sync" && changes.outputMode !== undefined) {
           const newMode = changes.outputMode.newValue;
           if (typeof newMode === "number") {
-            this.state.outputMode = newMode as OutputMode;
+            this.currentMode = newMode as OutputMode;
             onStateChange?.();
           }
         }
@@ -51,38 +55,37 @@ export class BackgroundBridge implements ComposerBridge {
   }
 
   public preedit(): string {
-    return this.state.preedit;
+    return this.session.preedit;
   }
 
   public candidates(): string[] {
-    return this.state.candidates;
+    return this.session.candidates;
   }
 
   public selected(): number {
-    return this.state.selected;
+    return this.session.selected;
   }
 
   public hints(): string[] {
-    return this.state.hints;
+    return this.session.hints;
   }
 
   public outputMode(): OutputMode {
-    return this.state.outputMode;
+    return this.currentMode;
   }
 
-  private updateState(res: any): void {
-    if (res?.preedit !== undefined) this.state.preedit = res.preedit;
-    if (res?.candidates !== undefined) this.state.candidates = res.candidates;
-    if (res?.selected !== undefined) this.state.selected = res.selected;
-    if (res?.hints !== undefined) this.state.hints = res.hints;
-    if (typeof res?.outputMode === "number") this.state.outputMode = res.outputMode as OutputMode;
+  private updateSession(res: Partial<ImeState>): void {
+    if (res.preedit !== undefined) this.session.preedit = res.preedit;
+    if (res.candidates !== undefined) this.session.candidates = res.candidates;
+    if (res.selected !== undefined) this.session.selected = res.selected;
+    if (res.hints !== undefined) this.session.hints = res.hints;
   }
 
   public async pushChar(char: string): Promise<boolean> {
     if (typeof chrome !== "undefined" && chrome?.runtime?.sendMessage) {
       const res = await chrome.runtime.sendMessage({ type: "PUSH_CHAR", char });
       if (res?.ok) {
-        this.updateState(res);
+        this.updateSession(res);
         return Boolean(res.handled);
       }
     }
@@ -93,7 +96,7 @@ export class BackgroundBridge implements ComposerBridge {
     if (typeof chrome !== "undefined" && chrome?.runtime?.sendMessage) {
       const res = await chrome.runtime.sendMessage({ type: "BACKSPACE" });
       if (res?.ok) {
-        this.updateState(res);
+        this.updateSession(res);
         return Boolean(res.handled);
       }
     }
@@ -101,14 +104,16 @@ export class BackgroundBridge implements ComposerBridge {
   }
 
   public async cancel(): Promise<void> {
-    this.state.preedit = "";
-    this.state.candidates = [];
-    this.state.selected = 0;
-    this.state.hints = [];
+    this.session = {
+      preedit: "",
+      candidates: [],
+      selected: 0,
+      hints: [],
+    };
     if (typeof chrome !== "undefined" && chrome?.runtime?.sendMessage) {
       const res = await chrome.runtime.sendMessage({ type: "CANCEL" });
       if (res?.ok) {
-        this.updateState(res);
+        this.updateSession(res);
       }
     }
   }
@@ -117,7 +122,7 @@ export class BackgroundBridge implements ComposerBridge {
     if (typeof chrome !== "undefined" && chrome?.runtime?.sendMessage) {
       const res = await chrome.runtime.sendMessage({ type: "MOVE_SELECTION", delta });
       if (res?.ok) {
-        this.updateState(res);
+        this.updateSession(res);
       }
     }
   }
@@ -126,7 +131,7 @@ export class BackgroundBridge implements ComposerBridge {
     if (typeof chrome !== "undefined" && chrome?.runtime?.sendMessage) {
       const res = await chrome.runtime.sendMessage({ type: "COMMIT_INDEX", index });
       if (res?.ok) {
-        this.updateState(res);
+        this.updateSession(res);
         return res.text ?? null;
       }
     }
@@ -134,11 +139,11 @@ export class BackgroundBridge implements ComposerBridge {
   }
 
   public async setOutputMode(mode: OutputMode): Promise<void> {
-    this.state.outputMode = mode;
+    this.currentMode = mode;
     if (typeof chrome !== "undefined" && chrome?.runtime?.sendMessage) {
       const res = await chrome.runtime.sendMessage({ type: "SET_OUTPUT_MODE", mode });
-      if (res?.ok) {
-        this.updateState(res);
+      if (res?.ok && typeof res.outputMode === "number") {
+        this.currentMode = res.outputMode as OutputMode;
       }
     }
   }
