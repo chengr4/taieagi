@@ -231,57 +231,62 @@ pub fn encode_compact(entries: &[LexiconEntry]) -> Vec<u8> {
     out
 }
 
+/// Reads a 1-byte length-prefixed UTF-8 string from `bytes` starting at `*i`,
+/// advancing `*i` past the string bytes on success.
+fn read_len_str(bytes: &[u8], i: &mut usize) -> Option<String> {
+    if *i >= bytes.len() {
+        return None;
+    }
+    let len = bytes[*i] as usize;
+    *i += 1;
+    if *i + len > bytes.len() {
+        return None;
+    }
+    let s = std::str::from_utf8(&bytes[*i..*i + len]).ok()?.to_string();
+    *i += len;
+    Some(s)
+}
+
+/// Reads a 1-byte length-prefixed sequence of tone numbers from `bytes` starting at `*i`,
+/// advancing `*i` past the tone bytes on success.
+fn read_tones(bytes: &[u8], i: &mut usize) -> Option<Vec<Tone>> {
+    if *i >= bytes.len() {
+        return None;
+    }
+    let len = bytes[*i] as usize;
+    *i += 1;
+    if *i + len > bytes.len() {
+        return None;
+    }
+    let mut tones = Vec::with_capacity(len);
+    for &b in &bytes[*i..*i + len] {
+        if let Some(t) = Tone::from_u8(b) {
+            tones.push(t);
+        }
+    }
+    *i += len;
+    Some(tones)
+}
+
 /// Decodes entries from a compact binary format into a `Vec<LexiconEntry>`.
 fn decode_compact(bytes: &[u8]) -> Vec<LexiconEntry> {
     let mut entries = Vec::new();
     let mut i = 0;
     while i < bytes.len() {
-        let tailo_len = bytes[i] as usize;
-        i += 1;
-        if i + tailo_len > bytes.len() {
+        let Some(tailo) = read_len_str(bytes, &mut i) else {
             break;
-        }
-        let tailo = match std::str::from_utf8(&bytes[i..i + tailo_len]) {
-            Ok(s) => s.to_string(),
-            Err(_) => break,
         };
-        i += tailo_len;
-
-        if i >= bytes.len() {
+        let Some(hanzi) = read_len_str(bytes, &mut i) else {
             break;
-        }
-        let hanzi_len = bytes[i] as usize;
-        i += 1;
-        if i + hanzi_len > bytes.len() {
-            break;
-        }
-        let hanzi = match std::str::from_utf8(&bytes[i..i + hanzi_len]) {
-            Ok(s) => s.to_string(),
-            Err(_) => break,
         };
-        i += hanzi_len;
-
         if i + 2 > bytes.len() {
             break;
         }
         let weight = u16::from_le_bytes([bytes[i], bytes[i + 1]]) as u32;
         i += 2;
-
-        if i >= bytes.len() {
+        let Some(tones) = read_tones(bytes, &mut i) else {
             break;
-        }
-        let tones_len = bytes[i] as usize;
-        i += 1;
-        if i + tones_len > bytes.len() {
-            break;
-        }
-        let mut tones = Vec::with_capacity(tones_len);
-        for &b in &bytes[i..i + tones_len] {
-            if let Some(t) = Tone::from_u8(b) {
-                tones.push(t);
-            }
-        }
-        i += tones_len;
+        };
 
         entries.push(LexiconEntry {
             tailo,
@@ -333,60 +338,18 @@ fn decode_hints_compact(bytes: &[u8]) -> Vec<(String, Candidate)> {
     let mut i = 0;
 
     while i < bytes.len() {
-        let typo_len = bytes[i] as usize;
-        i += 1;
-        if i + typo_len > bytes.len() {
+        let Some(typo) = read_len_str(bytes, &mut i) else {
             break;
-        }
-        let typo = match std::str::from_utf8(&bytes[i..i + typo_len]) {
-            Ok(s) => s.to_string(),
-            Err(_) => break,
         };
-        i += typo_len;
-
-        if i >= bytes.len() {
+        let Some(tailo) = read_len_str(bytes, &mut i) else {
             break;
-        }
-        let tailo_len = bytes[i] as usize;
-        i += 1;
-        if i + tailo_len > bytes.len() {
-            break;
-        }
-        let tailo = match std::str::from_utf8(&bytes[i..i + tailo_len]) {
-            Ok(s) => s.to_string(),
-            Err(_) => break,
         };
-        i += tailo_len;
-
-        if i >= bytes.len() {
+        let Some(hanzi) = read_len_str(bytes, &mut i) else {
             break;
-        }
-        let hanzi_len = bytes[i] as usize;
-        i += 1;
-        if i + hanzi_len > bytes.len() {
-            break;
-        }
-        let hanzi = match std::str::from_utf8(&bytes[i..i + hanzi_len]) {
-            Ok(s) => s.to_string(),
-            Err(_) => break,
         };
-        i += hanzi_len;
-
-        if i >= bytes.len() {
+        let Some(tones) = read_tones(bytes, &mut i) else {
             break;
-        }
-        let tones_len = bytes[i] as usize;
-        i += 1;
-        if i + tones_len > bytes.len() {
-            break;
-        }
-        let mut tones = Vec::with_capacity(tones_len);
-        for &b in &bytes[i..i + tones_len] {
-            if let Some(t) = Tone::from_u8(b) {
-                tones.push(t);
-            }
-        }
-        i += tones_len;
+        };
 
         pairs.push((
             typo,
