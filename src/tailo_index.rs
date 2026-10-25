@@ -38,14 +38,25 @@ impl From<&LexiconEntry> for Candidate {
     }
 }
 
-#[derive(Default)]
-struct TrieNode {
-    children: HashMap<char, TrieNode>,
-    entries: Vec<LexiconEntry>,
+/// Maximum number of orthographic hints returned by a prefix lookup.
+const MAX_HINTS: usize = 3;
+
+struct TrieNode<T> {
+    children: HashMap<char, TrieNode<T>>,
+    entries: Vec<T>,
 }
 
-impl TrieNode {
-    fn collect_into<'a>(&'a self, out: &mut Vec<&'a LexiconEntry>) {
+impl<T> Default for TrieNode<T> {
+    fn default() -> Self {
+        Self {
+            children: HashMap::new(),
+            entries: Vec::new(),
+        }
+    }
+}
+
+impl<T> TrieNode<T> {
+    fn collect_into<'a>(&'a self, out: &mut Vec<&'a T>) {
         out.extend(self.entries.iter());
         for child in self.children.values() {
             child.collect_into(out);
@@ -56,12 +67,12 @@ impl TrieNode {
 static COMPACT_DICT: &[u8] = include_bytes!("../assets/dict.compact");
 static COMPACT_HINTS: &[u8] = include_bytes!("../assets/hints.compact");
 
-/// Prefix index over Tâi-lô keys, backed by a simple HashMap trie, along with
-/// exact-match orthographic hints for common colloquial misspellings.
+/// Prefix index over Tâi-lô keys and orthographic hints for common colloquial
+/// misspellings, both backed by a HashMap trie.
 #[derive(Default)]
 pub(crate) struct TailoIndex {
-    root: TrieNode,
-    hints: HashMap<String, Vec<Candidate>>,
+    lexicon_root: TrieNode<LexiconEntry>,
+    hints_root: TrieNode<Candidate>,
 }
 
 /// Normalizes a romanization into a trie key: lowercase letters only,
@@ -88,7 +99,7 @@ impl TailoIndex {
         if key.is_empty() {
             return;
         }
-        let mut node = &mut self.root;
+        let mut node = &mut self.lexicon_root;
         for c in key.chars() {
             node = node.children.entry(c).or_default();
         }
@@ -101,25 +112,59 @@ impl TailoIndex {
         if key.is_empty() {
             return;
         }
-        let list = self.hints.entry(key).or_default();
-        if !list
+        let mut node = &mut self.hints_root;
+        for c in key.chars() {
+            node = node.children.entry(c).or_default();
+        }
+        if !node
+            .entries
             .iter()
             .any(|c| c.hanzi == candidate.hanzi && c.tailo == candidate.tailo)
         {
-            list.push(candidate);
+            node.entries.push(candidate);
         }
     }
 
-    /// Looks up read-only hint candidates by exact alphabetic match.
-    pub(crate) fn lookup_hints(&self, input: &str) -> &[Candidate] {
+    /// Looks up up to [`MAX_HINTS`] read-only hint candidates by prefix match,
+    /// prioritizing exact matches before shorter prefix extensions.
+    pub(crate) fn lookup_hints(&self, input: &str) -> Vec<Candidate> {
         if input.is_empty() || !input.chars().all(|c| c.is_ascii_alphabetic() || c == '-') {
-            return &[];
+            return Vec::new();
         }
         let key = normalize(input);
         if key.is_empty() {
-            return &[];
+            return Vec::new();
         }
-        self.hints.get(&key).map(|v| v.as_slice()).unwrap_or(&[])
+
+        let mut node = &self.hints_root;
+        for c in key.chars() {
+            match node.children.get(&c) {
+                Some(next) => node = next,
+                None => return Vec::new(),
+            }
+        }
+
+        let mut prefix_entries = Vec::new();
+        for child in node.children.values() {
+            child.collect_into(&mut prefix_entries);
+        }
+        prefix_entries.sort_by(|a, b| {
+            a.tones
+                .len()
+                .cmp(&b.tones.len())
+                .then_with(|| a.hanzi.len().cmp(&b.hanzi.len()))
+                .then_with(|| a.hanzi.cmp(&b.hanzi))
+                .then_with(|| a.tailo.cmp(&b.tailo))
+        });
+
+        let mut seen = HashSet::new();
+        node.entries
+            .iter()
+            .chain(prefix_entries)
+            .filter(|c| seen.insert((c.hanzi.as_str(), c.tailo.as_str())))
+            .take(MAX_HINTS)
+            .cloned()
+            .collect()
     }
 
     /// Looks up candidates by typed input, prioritizing exact matches over prefix
@@ -142,7 +187,7 @@ impl TailoIndex {
             return Vec::new();
         }
 
-        let mut node = &self.root;
+        let mut node = &self.lexicon_root;
         for c in key.chars() {
             match node.children.get(&c) {
                 Some(next) => node = next,
@@ -481,7 +526,7 @@ mod tests {
     }
 
     #[test]
-    fn test_insert_and_exact_lookup_hints() {
+    fn test_insert_and_prefix_lookup_hints() {
         let mut idx = TailoIndex::default();
         let cand = |hanzi: &str, tailo: &str, tones: &[Tone]| Candidate {
             hanzi: hanzi.to_string(),
@@ -492,10 +537,36 @@ mod tests {
         idx.insert_hint("jia", cand("食", "tsiah", &[Tone::Tone8]));
         idx.insert_hint("jia", cand("遮", "tsia", &[Tone::Tone1]));
         idx.insert_hint("jia", cand("食", "tsiah", &[Tone::Tone8]));
+        idx.insert_hint(
+            "jiababue",
+            cand(
+                "食飽未",
+                "tsiah-pa-bue",
+                &[Tone::Tone8, Tone::Tone2, Tone::Tone7],
+            ),
+        );
+        idx.insert_hint(
+            "jiauji",
+            cand(
+                "遮有一陣人",
+                "tsia u tsit-tin lang",
+                &[
+                    Tone::Tone1,
+                    Tone::Tone7,
+                    Tone::Tone8,
+                    Tone::Tone7,
+                    Tone::Tone5,
+                ],
+            ),
+        );
 
-        assert!(idx.lookup_hints("jir").is_empty());
-        assert_eq!(hanzi_of(idx.lookup_hints("jire")), vec!["這个"]);
-        assert_eq!(hanzi_of(idx.lookup_hints("jia")), vec!["食", "遮"]);
+        assert_eq!(hanzi_of(&idx.lookup_hints("jir")), vec!["這个"]);
+        assert_eq!(hanzi_of(&idx.lookup_hints("jire")), vec!["這个"]);
+        // Exact matches ("食", "遮") rank first, followed by shorter prefix match ("食飽未"), capped at 3
+        assert_eq!(
+            hanzi_of(&idx.lookup_hints("jia")),
+            vec!["食", "遮", "食飽未"]
+        );
     }
 
     #[test]
@@ -511,8 +582,8 @@ mod tests {
         ]);
         let mut idx = TailoIndex::default();
         idx.load_hints_compact(&bytes);
-        assert_eq!(idx.lookup_hints("jire"), std::slice::from_ref(&cand));
-        assert_eq!(idx.lookup_hints("jile"), &[cand]);
+        assert_eq!(idx.lookup_hints("jire"), vec![cand.clone()]);
+        assert_eq!(idx.lookup_hints("jile"), vec![cand]);
     }
 
     #[test]

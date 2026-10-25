@@ -139,6 +139,12 @@ impl Composer {
         }
 
         self.refresh();
+        if self.candidates.is_empty() {
+            let matched_hints = self.index.lookup_hints(&self.buffer);
+            if !matched_hints.is_empty() {
+                self.active_hints = matched_hints;
+            }
+        }
         EditOutcome::Handled
     }
 
@@ -200,10 +206,6 @@ impl Composer {
 
     fn refresh(&mut self) {
         self.candidates = self.index.lookup(&self.buffer);
-        let matched_hints = self.index.lookup_hints(&self.buffer);
-        if !matched_hints.is_empty() {
-            self.active_hints = matched_hints.to_vec();
-        }
         self.selected = 0;
     }
 
@@ -485,6 +487,12 @@ mod tests {
             weight: 100,
             tones: vec![Tone::Tone4, Tone::Tone5],
         });
+        index.insert(LexiconEntry {
+            tailo: "jit".to_string(),
+            hanzi: "日".to_string(),
+            weight: 90,
+            tones: vec![Tone::Tone8],
+        });
         index.insert_hint(
             "jire",
             Candidate {
@@ -503,8 +511,16 @@ mod tests {
         );
         let mut e = Composer::new(index);
 
-        type_str(&mut e, "jir");
+        // While "ji" still has valid dictionary candidates ("日"), prefix hints do not trigger
+        type_str(&mut e, "ji");
+        assert!(!e.candidates().is_empty());
         assert!(e.hints().is_empty());
+
+        // Once "jir" has no dictionary candidates, prefix hint triggers immediately
+        e.push_char('r');
+        assert!(e.candidates().is_empty());
+        assert_eq!(e.hints().len(), 1);
+        assert_eq!(e.hints()[0].hanzi, "這个");
 
         e.push_char('e');
         assert_eq!(e.hints().len(), 1);
