@@ -139,11 +139,9 @@ impl Composer {
         }
 
         self.refresh();
-        if self.candidates.is_empty() {
-            let matched_hints = self.index.lookup_hints(&self.buffer);
-            if !matched_hints.is_empty() {
-                self.active_hints = matched_hints;
-            }
+        let matched_hints = self.index.lookup_hints(&self.buffer);
+        if !matched_hints.is_empty() {
+            self.active_hints = matched_hints;
         }
         EditOutcome::Handled
     }
@@ -511,12 +509,13 @@ mod tests {
         );
         let mut e = Composer::new(index);
 
-        // While "ji" still has valid dictionary candidates ("日"), prefix hints do not trigger
+        // When "ji" has valid dictionary candidates ("日"), prefix hints ("這个") also trigger simultaneously
         type_str(&mut e, "ji");
         assert!(!e.candidates().is_empty());
-        assert!(e.hints().is_empty());
+        assert_eq!(e.hints().len(), 1);
+        assert_eq!(e.hints()[0].hanzi, "這个");
 
-        // Once "jir" has no dictionary candidates, prefix hint triggers immediately
+        // Continuing with "r" ("jir") clears dictionary candidates while keeping prefix hint
         e.push_char('r');
         assert!(e.candidates().is_empty());
         assert_eq!(e.hints().len(), 1);

@@ -628,6 +628,8 @@ mod tests {
         assert!(mutan_hints.iter().any(|c| c.hanzi == "毋通"));
         let dongbeitiao_hints = index.lookup_hints("dongbeitiao");
         assert!(dongbeitiao_hints.iter().any(|c| c.hanzi == "擋袂牢"));
+        let tian_hints = index.lookup_hints("tian");
+        assert!(tian_hints.iter().any(|c| c.hanzi == "忝"));
 
         // Verify slang and lyrics hints (prefix and exact match)
         let risi_hints = index.lookup_hints("risihinkang");
