@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
-use taieagi::{Candidate, LexiconEntry, encode_compact, encode_hints_compact, parse_tailo_word};
+use taieagi::{Candidate, LexiconEntry};
 
 /// Parses a CSV line respecting quoted fields.
 fn parse_csv_line(line: &str) -> Vec<String> {
@@ -142,17 +142,8 @@ fn kana_to_romaji(input: &str) -> String {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
-    let input_path = if args.len() > 1 {
-        &args[1]
-    } else {
-        "assets/moe_raw.csv"
-    };
-
-    let output_path = if args.len() > 2 {
-        &args[2]
-    } else {
-        "assets/dict.compact"
-    };
+    let input_path = args.get(1).map_or("assets/moe_raw.csv", String::as_str);
+    let output_path = args.get(2).map_or("assets/dict.compact", String::as_str);
 
     println!("📖 Reading source dataset from: {}", input_path);
     let file = File::open(Path::new(input_path))?;
@@ -195,18 +186,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Split multiple pronunciations separated by '/'
         for reading in raw_tailo_col.split('/') {
-            let mut reading_trimmed = reading.trim().to_string();
+            let reading_trimmed = reading.trim();
             if reading_trimmed.is_empty() {
                 continue;
             }
 
-            // Convert Japanese Kana if present (Option A)
-            if contains_kana(&reading_trimmed) {
-                reading_trimmed = kana_to_romaji(&reading_trimmed);
-            }
-
-            // Parse syllable structure and tones
-            let (plain_tailo, tones) = parse_tailo_word(&reading_trimmed);
+            // Convert Japanese Kana if present (Option A), otherwise borrow slice directly
+            let (plain_tailo, tones) = if contains_kana(reading_trimmed) {
+                let romaji = kana_to_romaji(reading_trimmed);
+                taieagi::parse_tailo_word(&romaji)
+            } else {
+                taieagi::parse_tailo_word(reading_trimmed)
+            };
             if plain_tailo.is_empty() {
                 continue;
             }
@@ -244,7 +235,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             let hanzi = &fields[0];
             for reading in fields[1].split('/') {
-                let (plain_tailo, tones) = parse_tailo_word(reading.trim());
+                let (plain_tailo, tones) = taieagi::parse_tailo_word(reading.trim());
                 if plain_tailo.is_empty() {
                     continue;
                 }
@@ -271,7 +262,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     println!("💾 Encoding into compact binary format...");
-    let compact_bytes = encode_compact(&entries);
+    let compact_bytes = taieagi::encode_compact(&entries);
     let size_kb = compact_bytes.len() as f64 / 1024.0;
     println!(
         "📏 Total binary size: {:.2} KB ({} bytes)",
@@ -308,7 +299,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 continue;
             }
             let hanzi = &fields[0];
-            let (plain_tailo, tones) = parse_tailo_word(fields[1].trim());
+            let (plain_tailo, tones) = taieagi::parse_tailo_word(fields[1].trim());
             if plain_tailo.is_empty() {
                 continue;
             }
@@ -326,7 +317,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     if !hint_pairs.is_empty() {
-        let hints_bytes = encode_hints_compact(&hint_pairs);
+        let hints_bytes = taieagi::encode_hints_compact(&hint_pairs);
         let hints_out_path = "assets/hints.compact";
         let mut hints_out = File::create(Path::new(hints_out_path))?;
         hints_out.write_all(&hints_bytes)?;

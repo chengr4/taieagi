@@ -1,6 +1,6 @@
 //! Prefix index keyed by Tâi-lô (TL) romanization, mapping typed letters to Taiwanese hanzi.
 
-use crate::tone::{Tone, split_syllable_and_tone};
+use crate::tone::{self, Tone};
 use std::collections::{HashMap, HashSet};
 
 /// One Taiwanese lexicon item: a Tâi-lô romanization and its hanzi form.
@@ -178,7 +178,7 @@ impl TailoIndex {
     /// - Input containing anything other than letters, hyphens, and one optional
     ///   trailing tone digit yields no candidates.
     pub(crate) fn lookup(&self, input: &str) -> Vec<Candidate> {
-        let (base, tone) = split_syllable_and_tone(input);
+        let (base, tone) = tone::split_syllable_and_tone(input);
         if !base.chars().all(|c| c.is_ascii_alphabetic() || c == '-') {
             return Vec::new();
         }

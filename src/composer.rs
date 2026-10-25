@@ -1,7 +1,7 @@
 //! Input method state machine: turns key events into a preedit buffer and candidates.
 
 use crate::tailo_index::{Candidate, TailoIndex};
-use crate::tone::{Tone, apply_tone};
+use crate::tone::{self, Tone};
 
 /// Formatting mode applied to committed candidates.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -46,7 +46,7 @@ pub(crate) fn format_commit(candidate: &Candidate, mode: OutputMode) -> String {
         OutputMode::HanziWithMarks => syllables
             .iter()
             .zip(&candidate.tones)
-            .map(|(syl, tone)| apply_tone(syl, *tone))
+            .map(|(syl, tone)| tone::apply_tone(syl, *tone))
             .collect::<Vec<_>>()
             .join("-"),
     };

@@ -1,6 +1,6 @@
 //! WebAssembly bindings for [`Composer`].
 
-use crate::composer::{Composer, EditOutcome, OutputMode, format_commit};
+use crate::composer::{self, Composer, EditOutcome, OutputMode};
 use wasm_bindgen::prelude::wasm_bindgen;
 
 /// WebAssembly-exported state machine for Taiwanese Romanization input.
@@ -68,7 +68,7 @@ impl WasmComposer {
         self.inner
             .hints()
             .iter()
-            .map(|c| format_commit(c, OutputMode::HanziWithMarks))
+            .map(|c| composer::format_commit(c, OutputMode::HanziWithMarks))
             .collect()
     }
 
