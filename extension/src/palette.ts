@@ -7,11 +7,12 @@ export enum OutputMode {
 }
 
 export interface ComposerBridge {
-  init(): Promise<void> | void;
+  init(onStateChange?: () => void): Promise<void> | void;
   preedit(): string;
   candidates(): string[];
   selected(): number;
   hints(): string[];
+  outputMode(): OutputMode;
   pushChar(char: string): Promise<boolean> | boolean;
   backspace(): Promise<boolean> | boolean;
   cancel(): Promise<void> | void;
@@ -26,14 +27,26 @@ export class BackgroundBridge implements ComposerBridge {
     candidates: [] as string[],
     selected: 0,
     hints: [] as string[],
+    outputMode: OutputMode.HanziOnly,
   };
 
-  public async init(): Promise<void> {
+  public async init(onStateChange?: () => void): Promise<void> {
     if (typeof chrome !== "undefined" && chrome?.runtime?.sendMessage) {
       const res = await chrome.runtime.sendMessage({ type: "INIT" });
       if (res?.ok) {
         this.updateState(res);
       }
+    }
+    if (typeof chrome !== "undefined" && chrome?.storage?.onChanged) {
+      chrome.storage.onChanged.addListener((changes, areaName) => {
+        if (areaName === "sync" && changes.outputMode !== undefined) {
+          const newMode = changes.outputMode.newValue;
+          if (typeof newMode === "number") {
+            this.state.outputMode = newMode as OutputMode;
+            onStateChange?.();
+          }
+        }
+      });
     }
   }
 
@@ -53,11 +66,16 @@ export class BackgroundBridge implements ComposerBridge {
     return this.state.hints;
   }
 
+  public outputMode(): OutputMode {
+    return this.state.outputMode;
+  }
+
   private updateState(res: any): void {
     if (res?.preedit !== undefined) this.state.preedit = res.preedit;
     if (res?.candidates !== undefined) this.state.candidates = res.candidates;
     if (res?.selected !== undefined) this.state.selected = res.selected;
     if (res?.hints !== undefined) this.state.hints = res.hints;
+    if (typeof res?.outputMode === "number") this.state.outputMode = res.outputMode as OutputMode;
   }
 
   public async pushChar(char: string): Promise<boolean> {
@@ -116,8 +134,12 @@ export class BackgroundBridge implements ComposerBridge {
   }
 
   public async setOutputMode(mode: OutputMode): Promise<void> {
+    this.state.outputMode = mode;
     if (typeof chrome !== "undefined" && chrome?.runtime?.sendMessage) {
-      await chrome.runtime.sendMessage({ type: "SET_OUTPUT_MODE", mode });
+      const res = await chrome.runtime.sendMessage({ type: "SET_OUTPUT_MODE", mode });
+      if (res?.ok) {
+        this.updateState(res);
+      }
     }
   }
 }
@@ -140,7 +162,11 @@ class SyncComposerAdapter implements ComposerBridge {
   }
 
   public hints(): string[] {
-    return typeof this.composer.hints === "function" ? this.composer.hints() : [];
+    return this.composer.hints();
+  }
+
+  public outputMode(): OutputMode {
+    return this.composer.output_mode() as OutputMode;
   }
 
   public pushChar(char: string): boolean {
@@ -164,9 +190,7 @@ class SyncComposerAdapter implements ComposerBridge {
   }
 
   public setOutputMode(mode: OutputMode): void {
-    if (typeof this.composer.set_output_mode === "function") {
-      this.composer.set_output_mode(mode);
-    }
+    this.composer.set_output_mode(mode);
   }
 }
 
@@ -179,7 +203,6 @@ export class Palette {
   private candidatesElem: HTMLDivElement | null = null;
   private hintsElem: HTMLDivElement | null = null;
   private modeBadgeElem: HTMLButtonElement | null = null;
-  private outputMode: OutputMode = OutputMode.HanziOnly;
   private bridge: ComposerBridge;
   private currentTarget: HTMLElement | null = null;
   private visible = false;
@@ -197,25 +220,14 @@ export class Palette {
   }
 
   public async init(): Promise<void> {
-    const initRes = this.bridge.init();
+    const initRes = this.bridge.init(() => {
+      this.updateModeBadge();
+    });
     if (initRes instanceof Promise) {
       await initRes;
     }
-    if (typeof chrome !== "undefined" && chrome?.storage?.sync) {
-      try {
-        const stored = await chrome.storage.sync.get("outputMode");
-        if (typeof stored?.outputMode === "number") {
-          this.outputMode = stored.outputMode as OutputMode;
-          if (this.modeBadgeElem) {
-            this.modeBadgeElem.textContent = this.getModeBadgeLabel();
-          }
-        }
-      } catch (err) {
-        console.error("[Taieagi Palette] Failed to load outputMode from storage:", err);
-      }
-    }
     this.createUI();
-    this.setupStorageSync();
+    this.updateModeBadge();
   }
 
   public isOpen(): boolean {
@@ -266,50 +278,38 @@ export class Palette {
   }
 
   public cycleOutputMode(): void {
+    const current = this.bridge.outputMode();
     const nextMode =
-      this.outputMode === OutputMode.HanziOnly
+      current === OutputMode.HanziOnly
         ? OutputMode.HanziWithMarks
-        : this.outputMode === OutputMode.HanziWithMarks
+        : current === OutputMode.HanziWithMarks
         ? OutputMode.HanziWithNumber
         : OutputMode.HanziOnly;
     this.setOutputMode(nextMode);
   }
 
   public setOutputMode(mode: OutputMode): void {
-    this.outputMode = mode;
-    this.bridge.setOutputMode(mode);
-    if (this.modeBadgeElem) {
-      this.modeBadgeElem.textContent = this.getModeBadgeLabel();
-    }
-    if (typeof chrome !== "undefined" && chrome?.storage?.sync) {
-      chrome.storage.sync.set({ outputMode: mode }).catch((err) => {
-        console.error("[Taieagi Palette] Failed to save outputMode to storage:", err);
+    const res = this.bridge.setOutputMode(mode);
+    this.updateModeBadge();
+    if (res instanceof Promise) {
+      res.then(() => {
+        this.updateModeBadge();
       });
     }
   }
 
-  private setupStorageSync(): void {
-    if (typeof chrome !== "undefined" && chrome?.storage?.onChanged) {
-      chrome.storage.onChanged.addListener((changes, areaName) => {
-        if (areaName === "sync" && changes.outputMode !== undefined) {
-          const newMode = changes.outputMode.newValue;
-          if (typeof newMode === "number") {
-            this.outputMode = newMode as OutputMode;
-            if (this.modeBadgeElem) {
-              this.modeBadgeElem.textContent = this.getModeBadgeLabel();
-            }
-          }
-        }
-      });
+  private updateModeBadge(): void {
+    if (this.modeBadgeElem) {
+      this.modeBadgeElem.textContent = this.getModeBadgeLabel();
     }
   }
 
   public getOutputMode(): OutputMode {
-    return this.outputMode;
+    return this.bridge.outputMode();
   }
 
   private getModeBadgeLabel(): string {
-    switch (this.outputMode) {
+    switch (this.bridge.outputMode()) {
       case OutputMode.HanziWithMarks:
         return "[漢+調]";
       case OutputMode.HanziWithNumber:

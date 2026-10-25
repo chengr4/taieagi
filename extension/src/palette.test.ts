@@ -7,6 +7,7 @@ describe("Palette", () => {
     let candidatesList: string[] = [];
     let selectedIdx = 0;
     let hintsList: string[] = [];
+    let currentMode = 0;
 
     return {
       preedit: () => preeditStr,
@@ -48,10 +49,10 @@ describe("Palette", () => {
         }
         return undefined;
       },
-      output_mode: () => 0,
-      set_output_mode: () => {},
-      free: () => {},
-      [Symbol.dispose]: () => {},
+      output_mode: () => currentMode,
+      set_output_mode: (mode: number) => {
+        currentMode = mode;
+      },
     } as any;
   }
 
@@ -388,11 +389,6 @@ describe("Palette", () => {
 
     try {
       const mockComposer = createMockComposer();
-      let setModeCalledWith: OutputMode | null = null;
-      mockComposer.set_output_mode = (mode: number) => {
-        setModeCalledWith = mode as OutputMode;
-      };
-
       const palette = new Palette(mockComposer);
       const mockTarget = {
         getBoundingClientRect: () => ({ top: 0, bottom: 20, left: 0, right: 100, width: 100, height: 20 }),
@@ -409,25 +405,25 @@ describe("Palette", () => {
       badge.click();
       expect(palette.getOutputMode()).toBe(OutputMode.HanziWithMarks);
       expect(badge.textContent).toBe("[漢+調]");
-      expect(setModeCalledWith).toBe(OutputMode.HanziWithMarks);
+      expect(mockComposer.output_mode()).toBe(OutputMode.HanziWithMarks);
 
       // 2nd click: HanziWithMarks -> HanziWithNumber
       badge.click();
       expect(palette.getOutputMode()).toBe(OutputMode.HanziWithNumber);
       expect(badge.textContent).toBe("[漢+數]");
-      expect(setModeCalledWith).toBe(OutputMode.HanziWithNumber);
+      expect(mockComposer.output_mode()).toBe(OutputMode.HanziWithNumber);
 
       // 3rd click: HanziWithNumber -> HanziOnly
       badge.click();
       expect(palette.getOutputMode()).toBe(OutputMode.HanziOnly);
       expect(badge.textContent).toBe("[純漢]");
-      expect(setModeCalledWith).toBe(OutputMode.HanziOnly);
+      expect(mockComposer.output_mode()).toBe(OutputMode.HanziOnly);
     } finally {
       delete (globalThis as any).document;
     }
   });
 
-  it("restores outputMode from chrome.storage.sync on init", async () => {
+  it("restores outputMode from background INIT on init", async () => {
     const createdElements: any[] = [];
     (globalThis as any).document = {
       createElement: (tag: string) => {
@@ -455,16 +451,22 @@ describe("Palette", () => {
     };
 
     (globalThis as any).chrome = {
-      storage: {
-        sync: {
-          get: async (key: string) => {
-            if (key === "outputMode") {
-              return { outputMode: OutputMode.HanziWithMarks };
-            }
-            return {};
-          },
-          set: async () => {},
+      runtime: {
+        sendMessage: async (msg: any) => {
+          if (msg.type === "INIT") {
+            return {
+              ok: true,
+              outputMode: OutputMode.HanziWithMarks,
+              preedit: "",
+              candidates: [],
+              selected: 0,
+              hints: [],
+            };
+          }
+          return { ok: true };
         },
+      },
+      storage: {
         onChanged: {
           addListener: () => {},
         },
@@ -472,8 +474,7 @@ describe("Palette", () => {
     };
 
     try {
-      const mockComposer = createMockComposer();
-      const palette = new Palette(mockComposer);
+      const palette = new Palette();
       await palette.init();
 
       const mockTarget = {
@@ -492,7 +493,7 @@ describe("Palette", () => {
     }
   });
 
-  it("updates outputMode and badge when chrome.storage.onChanged fires", async () => {
+  it("delegates SET_OUTPUT_MODE to background and updates badge when chrome.storage.onChanged fires", async () => {
     const createdElements: any[] = [];
     (globalThis as any).document = {
       createElement: (tag: string) => {
@@ -520,16 +521,26 @@ describe("Palette", () => {
     };
 
     let storageListener: ((changes: any, areaName: string) => void) | null = null;
-    let savedStorageData: any = null;
+    let sentMessage: any = null;
 
     (globalThis as any).chrome = {
-      storage: {
-        sync: {
-          get: async () => ({}),
-          set: async (data: any) => {
-            savedStorageData = data;
-          },
+      runtime: {
+        sendMessage: async (msg: any) => {
+          sentMessage = msg;
+          if (msg.type === "SET_OUTPUT_MODE") {
+            return { ok: true, outputMode: msg.mode };
+          }
+          return {
+            ok: true,
+            outputMode: OutputMode.HanziOnly,
+            preedit: "",
+            candidates: [],
+            selected: 0,
+            hints: [],
+          };
         },
+      },
+      storage: {
         onChanged: {
           addListener: (fn: any) => {
             storageListener = fn;
@@ -539,8 +550,7 @@ describe("Palette", () => {
     };
 
     try {
-      const mockComposer = createMockComposer();
-      const palette = new Palette(mockComposer);
+      const palette = new Palette();
       await palette.init();
 
       const mockTarget = {
@@ -553,12 +563,12 @@ describe("Palette", () => {
       expect(badge.textContent).toBe("[純漢]");
       expect(palette.getOutputMode()).toBe(OutputMode.HanziOnly);
 
-      // Verify saving to storage when setOutputMode is called
+      // Verify delegating SET_OUTPUT_MODE to background when setOutputMode is called
       palette.setOutputMode(OutputMode.HanziWithNumber);
-      expect(savedStorageData).toEqual({ outputMode: OutputMode.HanziWithNumber });
+      expect(sentMessage).toEqual({ type: "SET_OUTPUT_MODE", mode: OutputMode.HanziWithNumber });
       expect(badge.textContent).toBe("[漢+數]");
 
-      // Verify onChanged updates mode and badge text
+      // Verify onChanged updates mode and badge text across tabs
       expect(storageListener).not.toBeNull();
       storageListener!(
         { outputMode: { newValue: OutputMode.HanziWithMarks } },

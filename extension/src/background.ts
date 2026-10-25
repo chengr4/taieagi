@@ -77,6 +77,7 @@ if (typeof chrome !== "undefined" && chrome?.runtime?.onMessage) {
           case "INIT": {
             sendResponse({
               ok: true,
+              outputMode: comp.output_mode(),
               ...snapshotState(comp),
             });
             break;
@@ -128,12 +129,13 @@ if (typeof chrome !== "undefined" && chrome?.runtime?.onMessage) {
           }
           case "SET_OUTPUT_MODE": {
             comp.set_output_mode(message.mode);
+            const outputMode = comp.output_mode();
             if (typeof chrome !== "undefined" && chrome?.storage?.sync) {
-              chrome.storage.sync.set({ outputMode: message.mode }).catch((err) => {
+              chrome.storage.sync.set({ outputMode }).catch((err) => {
                 console.error("[Taieagi Background] Failed to save outputMode to storage:", err);
               });
             }
-            sendResponse({ ok: true });
+            sendResponse({ ok: true, outputMode });
             break;
           }
           default:
