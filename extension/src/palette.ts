@@ -144,56 +144,6 @@ export class BackgroundBridge implements ComposerBridge {
   }
 }
 
-class SyncComposerAdapter implements ComposerBridge {
-  constructor(private composer: any) {}
-
-  public init(): void {}
-
-  public preedit(): string {
-    return this.composer.preedit();
-  }
-
-  public candidates(): string[] {
-    return this.composer.candidates();
-  }
-
-  public selected(): number {
-    return this.composer.selected();
-  }
-
-  public hints(): string[] {
-    return this.composer.hints();
-  }
-
-  public outputMode(): OutputMode {
-    return this.composer.output_mode() as OutputMode;
-  }
-
-  public pushChar(char: string): boolean {
-    return Boolean(this.composer.push_char(char));
-  }
-
-  public backspace(): boolean {
-    return Boolean(this.composer.backspace());
-  }
-
-  public cancel(): void {
-    this.composer.cancel();
-  }
-
-  public moveSelection(delta: number): void {
-    this.composer.move_selection(delta);
-  }
-
-  public commitIndex(index: number): string | null {
-    return this.composer.commit_index(index) ?? null;
-  }
-
-  public setOutputMode(mode: OutputMode): void {
-    this.composer.set_output_mode(mode);
-  }
-}
-
 export const CANDIDATE_PAGE_SIZE = 9;
 
 export class Palette {
@@ -207,16 +157,8 @@ export class Palette {
   private currentTarget: HTMLElement | null = null;
   private visible = false;
 
-  constructor(bridgeOrComposer?: ComposerBridge | any) {
-    if (bridgeOrComposer) {
-      if (typeof bridgeOrComposer.pushChar === "function") {
-        this.bridge = bridgeOrComposer;
-      } else {
-        this.bridge = new SyncComposerAdapter(bridgeOrComposer);
-      }
-    } else {
-      this.bridge = new BackgroundBridge();
-    }
+  constructor(bridge: ComposerBridge = new BackgroundBridge()) {
+    this.bridge = bridge;
   }
 
   public async init(): Promise<void> {

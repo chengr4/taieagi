@@ -1,27 +1,28 @@
 import { describe, expect, it } from "bun:test";
-import { CANDIDATE_PAGE_SIZE, OutputMode, Palette } from "./palette";
+import { CANDIDATE_PAGE_SIZE, type ComposerBridge, OutputMode, Palette } from "./palette";
 
 describe("Palette", () => {
-  function createMockComposer() {
+  function createMockBridge(): ComposerBridge {
     let preeditStr = "";
     let candidatesList: string[] = [];
     let selectedIdx = 0;
     let hintsList: string[] = [];
-    let currentMode = 0;
+    let currentMode: OutputMode = OutputMode.HanziOnly;
 
     return {
+      init: () => {},
       preedit: () => preeditStr,
       candidates: () => candidatesList,
       selected: () => selectedIdx,
       hints: () => hintsList,
+      outputMode: () => currentMode,
       cancel: () => {
         preeditStr = "";
         candidatesList = [];
         selectedIdx = 0;
         hintsList = [];
-        return true;
       },
-      push_char: (c: string) => {
+      pushChar: (c: string) => {
         preeditStr += c;
         if (preeditStr === "tsui") {
           candidatesList = ["水", "媠", "嘴"];
@@ -36,29 +37,27 @@ describe("Palette", () => {
         preeditStr = preeditStr.slice(0, -1);
         return true;
       },
-      move_selection: (delta: number) => {
+      moveSelection: (delta: number) => {
         selectedIdx = Math.max(0, Math.min(candidatesList.length - 1, selectedIdx + delta));
-        return true;
       },
-      commit_index: (index: number) => {
+      commitIndex: (index: number) => {
         if (index >= 0 && index < candidatesList.length) {
           const text = candidatesList[index];
           preeditStr = "";
           candidatesList = [];
           return text;
         }
-        return undefined;
+        return null;
       },
-      output_mode: () => currentMode,
-      set_output_mode: (mode: number) => {
+      setOutputMode: (mode: OutputMode) => {
         currentMode = mode;
       },
-    } as any;
+    };
   }
 
   it("opens, closes, and toggles relative to target element", () => {
-    const mockComposer = createMockComposer();
-    const palette = new Palette(mockComposer);
+    const mockBridge = createMockBridge();
+    const palette = new Palette(mockBridge);
     const mockTarget = {
       tagName: "TEXTAREA",
       getBoundingClientRect: () => ({ top: 100, bottom: 130, left: 50, right: 250, width: 200, height: 30 }),
@@ -77,8 +76,8 @@ describe("Palette", () => {
   });
 
   it("handles keyboard events: typing letters, navigating candidates, and committing", () => {
-    const mockComposer = createMockComposer();
-    const palette = new Palette(mockComposer);
+    const mockBridge = createMockBridge();
+    const palette = new Palette(mockBridge);
     const mockTarget = {
       tagName: "TEXTAREA",
       value: "",
@@ -101,8 +100,8 @@ describe("Palette", () => {
       expect(handled).toBe(true);
     }
 
-    expect(mockComposer.preedit()).toBe("tsui");
-    expect(mockComposer.candidates()).toEqual(["水", "媠", "嘴"]);
+    expect(mockBridge.preedit()).toBe("tsui");
+    expect(mockBridge.candidates()).toEqual(["水", "媠", "嘴"]);
 
     // Navigate to candidate 2 ("媠")
     const navHandled = palette.handleKeyDown({
@@ -111,7 +110,7 @@ describe("Palette", () => {
       stopPropagation: () => {},
     } as any);
     expect(navHandled).toBe(true);
-    expect(mockComposer.selected()).toBe(1);
+    expect(mockBridge.selected()).toBe(1);
 
     // Commit with Space
     const commitHandled = palette.handleKeyDown({
@@ -125,8 +124,8 @@ describe("Palette", () => {
   });
 
   it("navigates across pages by CANDIDATE_PAGE_SIZE using ArrowDown/ArrowUp and Shift+Tab", () => {
-    const mockComposer = createMockComposer();
-    const palette = new Palette(mockComposer);
+    const mockBridge = createMockBridge();
+    const palette = new Palette(mockBridge);
     const mockTarget = {
       tagName: "TEXTAREA",
       value: "",
@@ -146,7 +145,7 @@ describe("Palette", () => {
     } as any);
 
     expect(CANDIDATE_PAGE_SIZE).toBe(9);
-    expect(mockComposer.selected()).toBe(0);
+    expect(mockBridge.selected()).toBe(0);
 
     // ArrowDown jumps to second page (index 9 -> "字10")
     palette.handleKeyDown({
@@ -154,7 +153,7 @@ describe("Palette", () => {
       preventDefault: () => {},
       stopPropagation: () => {},
     } as any);
-    expect(mockComposer.selected()).toBe(9);
+    expect(mockBridge.selected()).toBe(9);
 
     // Shift+Tab steps back by 1 to index 8 ("字9", end of first page)
     palette.handleKeyDown({
@@ -163,7 +162,7 @@ describe("Palette", () => {
       preventDefault: () => {},
       stopPropagation: () => {},
     } as any);
-    expect(mockComposer.selected()).toBe(8);
+    expect(mockBridge.selected()).toBe(8);
 
     // PageDown clamps to last item (index 11 -> "字12")
     palette.handleKeyDown({
@@ -171,7 +170,7 @@ describe("Palette", () => {
       preventDefault: () => {},
       stopPropagation: () => {},
     } as any);
-    expect(mockComposer.selected()).toBe(11);
+    expect(mockBridge.selected()).toBe(11);
 
     // ArrowUp jumps back by 9 to index 2 ("字3")
     palette.handleKeyDown({
@@ -179,12 +178,12 @@ describe("Palette", () => {
       preventDefault: () => {},
       stopPropagation: () => {},
     } as any);
-    expect(mockComposer.selected()).toBe(2);
+    expect(mockBridge.selected()).toBe(2);
   });
 
   it("closes on Escape key when buffer is empty", () => {
-    const mockComposer = createMockComposer();
-    const palette = new Palette(mockComposer);
+    const mockBridge = createMockBridge();
+    const palette = new Palette(mockBridge);
     const mockTarget = {
       getBoundingClientRect: () => ({ top: 0, bottom: 20, left: 0, right: 100, width: 100, height: 20 }),
     } as any;
@@ -203,8 +202,8 @@ describe("Palette", () => {
   });
 
   it("clears buffer on Escape when buffer is not empty, and closes on subsequent Escape", () => {
-    const mockComposer = createMockComposer();
-    const palette = new Palette(mockComposer);
+    const mockBridge = createMockBridge();
+    const palette = new Palette(mockBridge);
     const mockTarget = {
       getBoundingClientRect: () => ({ top: 0, bottom: 20, left: 0, right: 100, width: 100, height: 20 }),
     } as any;
@@ -217,7 +216,7 @@ describe("Palette", () => {
       preventDefault: () => {},
       stopPropagation: () => {},
     } as any);
-    expect(mockComposer.preedit()).toBe("a");
+    expect(mockBridge.preedit()).toBe("a");
 
     // First Escape: buffer is non-empty, so clear buffer and stay open
     let handled = palette.handleKeyDown({
@@ -226,7 +225,7 @@ describe("Palette", () => {
       stopPropagation: () => {},
     } as any);
     expect(handled).toBe(true);
-    expect(mockComposer.preedit()).toBe("");
+    expect(mockBridge.preedit()).toBe("");
     expect(palette.isOpen()).toBe(true);
 
     // Second Escape: buffer is now empty, so close palette
@@ -240,8 +239,8 @@ describe("Palette", () => {
   });
 
   it("keeps palette open when Backspace is pressed on empty buffer", () => {
-    const mockComposer = createMockComposer();
-    const palette = new Palette(mockComposer);
+    const mockBridge = createMockBridge();
+    const palette = new Palette(mockBridge);
     const mockTarget = {
       getBoundingClientRect: () => ({ top: 0, bottom: 20, left: 0, right: 100, width: 100, height: 20 }),
     } as any;
@@ -297,8 +296,8 @@ describe("Palette", () => {
     };
 
     try {
-      const mockComposer = createMockComposer();
-      const palette = new Palette(mockComposer);
+      const mockBridge = createMockBridge();
+      const palette = new Palette(mockBridge);
       const mockTarget = {
         getBoundingClientRect: () => ({ top: 0, bottom: 20, left: 0, right: 100, width: 100, height: 20 }),
       } as any;
@@ -388,8 +387,8 @@ describe("Palette", () => {
     };
 
     try {
-      const mockComposer = createMockComposer();
-      const palette = new Palette(mockComposer);
+      const mockBridge = createMockBridge();
+      const palette = new Palette(mockBridge);
       const mockTarget = {
         getBoundingClientRect: () => ({ top: 0, bottom: 20, left: 0, right: 100, width: 100, height: 20 }),
       } as any;
@@ -405,19 +404,19 @@ describe("Palette", () => {
       badge.click();
       expect(palette.getOutputMode()).toBe(OutputMode.HanziWithMarks);
       expect(badge.textContent).toBe("[漢+調]");
-      expect(mockComposer.output_mode()).toBe(OutputMode.HanziWithMarks);
+      expect(mockBridge.outputMode()).toBe(OutputMode.HanziWithMarks);
 
       // 2nd click: HanziWithMarks -> HanziWithNumber
       badge.click();
       expect(palette.getOutputMode()).toBe(OutputMode.HanziWithNumber);
       expect(badge.textContent).toBe("[漢+數]");
-      expect(mockComposer.output_mode()).toBe(OutputMode.HanziWithNumber);
+      expect(mockBridge.outputMode()).toBe(OutputMode.HanziWithNumber);
 
       // 3rd click: HanziWithNumber -> HanziOnly
       badge.click();
       expect(palette.getOutputMode()).toBe(OutputMode.HanziOnly);
       expect(badge.textContent).toBe("[純漢]");
-      expect(mockComposer.output_mode()).toBe(OutputMode.HanziOnly);
+      expect(mockBridge.outputMode()).toBe(OutputMode.HanziOnly);
     } finally {
       delete (globalThis as any).document;
     }
