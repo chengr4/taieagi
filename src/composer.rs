@@ -68,6 +68,7 @@ pub(crate) struct Composer {
     index: TailoIndex,
     buffer: String,
     candidates: Vec<Candidate>,
+    active_hints: Vec<Candidate>,
     selected: usize,
     mode: OutputMode,
 }
@@ -83,6 +84,7 @@ impl Composer {
             index,
             buffer: String::new(),
             candidates: Vec::new(),
+            active_hints: Vec::new(),
             selected: 0,
             mode: OutputMode::default(),
         }
@@ -160,10 +162,10 @@ impl Composer {
         EditOutcome::Handled
     }
 
-    /// Commits the highlighted candidate (Space / Enter / Click).
-    /// With no candidates the action is ignored and the buffer is left unchanged.
-    pub(crate) fn commit_selected(&mut self) -> Option<String> {
-        let candidate = self.candidates.get(self.selected)?;
+    /// Commits the candidate at `index` (0-based).
+    /// If `index` is out of bounds, the action is ignored and the buffer is left unchanged.
+    pub(crate) fn commit_index(&mut self, index: usize) -> Option<String> {
+        let candidate = self.candidates.get(index)?;
         let text = format_commit(candidate, self.mode);
         self.reset();
         Some(text)
@@ -171,7 +173,7 @@ impl Composer {
 
     /// Abandons the current input (Esc). `PassThrough` if nothing is being composed.
     pub(crate) fn cancel(&mut self) -> EditOutcome {
-        if self.buffer.is_empty() {
+        if self.buffer.is_empty() && self.active_hints.is_empty() {
             return EditOutcome::PassThrough;
         }
         self.reset();
@@ -188,7 +190,7 @@ impl Composer {
     }
 
     pub(crate) fn hints(&self) -> &[Candidate] {
-        self.index.lookup_hints(&self.buffer)
+        &self.active_hints
     }
 
     /// Highlighted candidate index, 0-based.
@@ -198,12 +200,17 @@ impl Composer {
 
     fn refresh(&mut self) {
         self.candidates = self.index.lookup(&self.buffer);
+        let matched_hints = self.index.lookup_hints(&self.buffer);
+        if !matched_hints.is_empty() {
+            self.active_hints = matched_hints.to_vec();
+        }
         self.selected = 0;
     }
 
     fn reset(&mut self) {
         self.buffer.clear();
         self.candidates.clear();
+        self.active_hints.clear();
         self.selected = 0;
     }
 }
@@ -305,11 +312,10 @@ mod tests {
     }
 
     #[test]
-    fn test_commit_selected_returns_highlighted_and_clears() {
+    fn test_commit_index_returns_candidate_and_clears() {
         let mut e = composer();
         type_str(&mut e, "tsui");
-        e.move_selection(1);
-        assert_eq!(e.commit_selected(), Some("媠".to_string()));
+        assert_eq!(e.commit_index(1), Some("媠".to_string()));
         assert_eq!(e.preedit(), "");
         assert!(e.candidates().is_empty());
         assert_eq!(e.selected(), 0);
@@ -319,7 +325,7 @@ mod tests {
     fn test_commit_with_no_candidates_keeps_buffer() {
         let mut e = composer();
         type_str(&mut e, "xyz");
-        assert_eq!(e.commit_selected(), None);
+        assert_eq!(e.commit_index(0), None);
         assert_eq!(e.preedit(), "xyz");
     }
 
@@ -472,17 +478,23 @@ mod tests {
         // HanziWithNumber mode
         e.set_output_mode(OutputMode::HanziWithNumber);
         assert_eq!(e.output_mode(), OutputMode::HanziWithNumber);
-        assert_eq!(e.commit_selected(), Some("啉水 (lim1-tsui2)".to_string()));
+        assert_eq!(e.commit_index(0), Some("啉水 (lim1-tsui2)".to_string()));
 
         // HanziWithMarks mode
         type_str(&mut e, "tsui");
         e.set_output_mode(OutputMode::HanziWithMarks);
-        assert_eq!(e.commit_selected(), Some("水 (tsui\u{0301})".to_string()));
+        assert_eq!(e.commit_index(0), Some("水 (tsui\u{0301})".to_string()));
     }
 
     #[test]
     fn test_composer_hints_delegation() {
         let mut index = TailoIndex::default();
+        index.insert(LexiconEntry {
+            tailo: "tsit-e".to_string(),
+            hanzi: "這个".to_string(),
+            weight: 100,
+            tones: vec![Tone::Tone4, Tone::Tone5],
+        });
         index.insert_hint(
             "jire",
             Candidate {
@@ -490,6 +502,15 @@ mod tests {
                 weight: 0,
                 tailo: "tsit-e".to_string(),
                 tones: vec![Tone::Tone4, Tone::Tone5],
+            },
+        );
+        index.insert_hint(
+            "aikun",
+            Candidate {
+                hanzi: "愛睏".to_string(),
+                weight: 0,
+                tailo: "ai-khun".to_string(),
+                tones: vec![Tone::Tone3, Tone::Tone3],
             },
         );
         let mut e = Composer::new(index);
@@ -501,8 +522,36 @@ mod tests {
         assert_eq!(e.hints().len(), 1);
         assert_eq!(e.hints()[0].hanzi, "這个");
         // Cannot commit read-only hints when candidates are empty
-        assert_eq!(e.commit_selected(), None);
+        assert_eq!(e.commit_index(0), None);
         assert_eq!(e.preedit(), "jire");
+
+        // Sticky hint persists across backspaces (even back to empty buffer)
+        for _ in 0..4 {
+            assert_eq!(e.backspace(), EditOutcome::Handled);
+            assert_eq!(e.hints().len(), 1);
+            assert_eq!(e.hints()[0].hanzi, "這个");
+        }
+        assert_eq!(e.preedit(), "");
+
+        // Typing another hint overwrites the sticky hint
+        type_str(&mut e, "aikun");
+        assert_eq!(e.hints().len(), 1);
+        assert_eq!(e.hints()[0].hanzi, "愛睏");
+
+        // Cancel clears both buffer and sticky hints
+        assert_eq!(e.cancel(), EditOutcome::Handled);
+        assert!(e.hints().is_empty());
+
+        // Trigger hint again, backspace to empty, then type correct Tailo and commit
+        type_str(&mut e, "jire");
+        assert_eq!(e.hints()[0].hanzi, "這个");
+        for _ in 0..4 {
+            e.backspace();
+        }
+        type_str(&mut e, "tsite");
+        assert_eq!(e.hints()[0].hanzi, "這个");
+        assert_eq!(e.commit_index(0), Some("這个".to_string()));
+        assert!(e.hints().is_empty());
     }
 
     #[test]
@@ -530,7 +579,7 @@ mod tests {
         assert_eq!(e.preedit(), "lim-tsui2");
 
         // Commit candidate clears buffer
-        assert_eq!(e.commit_selected(), Some("啉水".to_string()));
+        assert_eq!(e.commit_index(0), Some("啉水".to_string()));
         assert_eq!(e.preedit(), "");
     }
 }

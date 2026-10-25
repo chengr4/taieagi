@@ -43,10 +43,10 @@ impl WasmComposer {
         self.inner.move_selection(delta) == EditOutcome::Handled
     }
 
-    /// Commits the currently highlighted candidate (Space / Enter / Click).
-    /// Returns the committed string if a candidate was available, or `None` otherwise.
-    pub fn commit_selected(&mut self) -> Option<String> {
-        self.inner.commit_selected()
+    /// Commits the candidate at the specified 0-based `index` (Space / Enter / Click).
+    /// Returns the committed string if the index is valid, or `None` otherwise.
+    pub fn commit_index(&mut self, index: usize) -> Option<String> {
+        self.inner.commit_index(index)
     }
 
     /// Returns the raw preedit string currently being composed.
@@ -132,7 +132,7 @@ mod tests {
         assert_eq!(wc.selected(), 1);
 
         // Commit candidate (HanziOnly default)
-        assert_eq!(wc.commit_selected(), Some(cands[1].clone()));
+        assert_eq!(wc.commit_index(wc.selected()), Some(cands[1].clone()));
         assert_eq!(wc.preedit(), "");
         assert!(wc.candidates().is_empty());
     }
@@ -146,7 +146,7 @@ mod tests {
         for c in "tsui2".chars() {
             wc.push_char(c);
         }
-        assert_eq!(wc.commit_selected(), Some("水 (tsui2)".to_string()));
+        assert_eq!(wc.commit_index(0), Some("水 (tsui2)".to_string()));
 
         wc.set_output_mode(2); // HanziWithMarks
         assert_eq!(wc.output_mode(), 2);
@@ -154,7 +154,7 @@ mod tests {
             wc.push_char(c);
         }
         assert_eq!(
-            wc.commit_selected(),
+            wc.commit_index(0),
             Some("啉水 (lim-tsui\u{0301})".to_string())
         );
     }

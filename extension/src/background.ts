@@ -12,7 +12,6 @@ export type ComposerAction =
   | { type: "BACKSPACE" }
   | { type: "CANCEL" }
   | { type: "MOVE_SELECTION"; delta: number }
-  | { type: "COMMIT_SELECTED" }
   | { type: "COMMIT_INDEX"; index: number };
 
 export type ConfigAction =
@@ -118,22 +117,8 @@ if (typeof chrome !== "undefined" && chrome?.runtime?.onMessage) {
             });
             break;
           }
-          case "COMMIT_SELECTED": {
-            const text = comp.commit_selected();
-            sendResponse({
-              ok: true,
-              text: text ?? null,
-              ...snapshotState(comp),
-            });
-            break;
-          }
           case "COMMIT_INDEX": {
-            const current = comp.selected();
-            const delta = message.index - current;
-            if (delta !== 0) {
-              comp.move_selection(delta);
-            }
-            const text = comp.commit_selected();
+            const text = comp.commit_index(message.index);
             sendResponse({
               ok: true,
               text: text ?? null,

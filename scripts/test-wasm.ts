@@ -28,8 +28,8 @@ async function main() {
     throw new Error(`Expected candidates to include '水', got: ${JSON.stringify(cands)}`);
   }
 
-  // Test commit selected
-  const committedText = composer.commit_selected();
+  // Test commit index
+  const committedText = composer.commit_index(composer.selected());
   console.log("Committed text:", committedText);
   if (committedText !== cands[0]) {
     throw new Error(`Expected '${cands[0]}', got '${committedText}'`);

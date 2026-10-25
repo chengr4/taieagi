@@ -16,7 +16,6 @@ export interface ComposerBridge {
   backspace(): Promise<boolean> | boolean;
   cancel(): Promise<void> | void;
   moveSelection(delta: number): Promise<void> | void;
-  commitSelected(): Promise<string | null> | string | null;
   commitIndex(index: number): Promise<string | null> | string | null;
   setOutputMode(mode: OutputMode): Promise<void> | void;
 }
@@ -106,17 +105,6 @@ export class BackgroundBridge implements ComposerBridge {
     }
   }
 
-  public async commitSelected(): Promise<string | null> {
-    if (typeof chrome !== "undefined" && chrome?.runtime?.sendMessage) {
-      const res = await chrome.runtime.sendMessage({ type: "COMMIT_SELECTED" });
-      if (res?.ok) {
-        this.updateState(res);
-        return res.text ?? null;
-      }
-    }
-    return null;
-  }
-
   public async commitIndex(index: number): Promise<string | null> {
     if (typeof chrome !== "undefined" && chrome?.runtime?.sendMessage) {
       const res = await chrome.runtime.sendMessage({ type: "COMMIT_INDEX", index });
@@ -172,16 +160,8 @@ class SyncComposerAdapter implements ComposerBridge {
     this.composer.move_selection(delta);
   }
 
-  public commitSelected(): string | null {
-    return this.composer.commit_selected() ?? null;
-  }
-
   public commitIndex(index: number): string | null {
-    const delta = index - this.composer.selected();
-    if (delta !== 0) {
-      this.composer.move_selection(delta);
-    }
-    return this.commitSelected();
+    return this.composer.commit_index(index) ?? null;
   }
 
   public setOutputMode(mode: OutputMode): void {
@@ -612,16 +592,7 @@ export class Palette {
       if (candidates.length > 0) {
         e.preventDefault();
         e.stopPropagation();
-        const res = this.bridge.commitSelected();
-        if (res instanceof Promise) {
-          res.then((text) => {
-            if (text) {
-              this.commitText(text);
-            }
-          });
-        } else if (res) {
-          this.commitText(res);
-        }
+        this.commitIndex(this.bridge.selected());
         return true;
       }
       if (this.bridge.preedit().length > 0) {

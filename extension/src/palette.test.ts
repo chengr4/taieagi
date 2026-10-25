@@ -39,9 +39,9 @@ describe("Palette", () => {
         selectedIdx = Math.max(0, Math.min(candidatesList.length - 1, selectedIdx + delta));
         return true;
       },
-      commit_selected: () => {
-        if (candidatesList.length > 0) {
-          const text = candidatesList[selectedIdx];
+      commit_index: (index: number) => {
+        if (index >= 0 && index < candidatesList.length) {
+          const text = candidatesList[index];
           preeditStr = "";
           candidatesList = [];
           return text;
