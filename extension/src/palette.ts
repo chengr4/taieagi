@@ -224,7 +224,7 @@ export class Palette {
     this.currentTarget = null;
   }
 
-  public cycleOutputMode(): void {
+  private cycleOutputMode(): void {
     const current = this.bridge.outputMode();
     const nextMode =
       current === OutputMode.HanziOnly
@@ -232,11 +232,7 @@ export class Palette {
         : current === OutputMode.HanziWithMarks
         ? OutputMode.HanziWithNumber
         : OutputMode.HanziOnly;
-    this.setOutputMode(nextMode);
-  }
-
-  public setOutputMode(mode: OutputMode): void {
-    const res = this.bridge.setOutputMode(mode);
+    const res = this.bridge.setOutputMode(nextMode);
     this.updateModeBadge();
     if (res instanceof Promise) {
       res.then(() => {
@@ -249,10 +245,6 @@ export class Palette {
     if (this.modeBadgeElem) {
       this.modeBadgeElem.textContent = this.getModeBadgeLabel();
     }
-  }
-
-  public getOutputMode(): OutputMode {
-    return this.bridge.outputMode();
   }
 
   private getModeBadgeLabel(): string {
