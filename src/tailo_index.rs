@@ -546,16 +546,16 @@ mod tests {
             ),
         );
         idx.insert_hint(
-            "jiauji",
+            "jiahuann",
             cand(
-                "遮有一陣人",
-                "tsia u tsit-tin lang",
+                "食飯配滷蛋",
+                "tsiah-png phue lo-tan",
                 &[
-                    Tone::Tone1,
-                    Tone::Tone7,
                     Tone::Tone8,
                     Tone::Tone7,
-                    Tone::Tone5,
+                    Tone::Tone3,
+                    Tone::Tone2,
+                    Tone::Tone7,
                 ],
             ),
         );
@@ -629,23 +629,21 @@ mod tests {
         let dongbeitiao_hints = index.lookup_hints("dongbeitiao");
         assert!(dongbeitiao_hints.iter().any(|c| c.hanzi == "擋袂牢"));
 
-        // Verify lyrics hints: dotsuting -> 島嶼天光, tingsin -> 天色漸漸光, jiauji -> 遮有一陣人
-        let dotsuting_hints = index.lookup_hints("dotsuting");
-        assert!(dotsuting_hints.iter().any(|c| c.hanzi == "島嶼天光"));
-        let tingsin_hints = index.lookup_hints("tingsin");
-        assert!(tingsin_hints.iter().any(|c| c.hanzi == "天色漸漸光"));
-        let jiauji_hints = index.lookup_hints("jiauji");
-        assert!(jiauji_hints.iter().any(|c| c.hanzi == "遮有一陣人"));
-
-        // Verify lyrics prefix lookup: thinnsik -> 天色漸漸光 (Prefix matching on Trie)
-        let thinnsik_cands = index.lookup("thinnsik");
-        assert!(thinnsik_cands.iter().any(|c| c.hanzi == "天色漸漸光"));
-
-        // Verify authentic Taiwanese lyrics: wagari -> 我合你上好就到遮, guakapli (prefix) -> 我合你上好就到遮
+        // Verify slang and lyrics hints (prefix and exact match)
+        let risi_hints = index.lookup_hints("risihinkang");
+        assert!(risi_hints.iter().any(|c| c.hanzi == "你是耳空生包皮"));
         let wagari_hints = index.lookup_hints("wagari");
         assert!(wagari_hints.iter().any(|c| c.hanzi == "我合你上好就到遮"));
+        let jimin_hints = index.lookup_hints("jimin");
+        assert!(jimin_hints.iter().any(|c| c.hanzi == "志明真正毋知欲按怎"));
+        let maigo_hints = index.lookup_hints("maigo");
+        assert!(maigo_hints.iter().any(|c| c.hanzi == "莫閣傷心"));
+
+        // Verify lyrics prefix lookup on lexicon trie
         let guakapli_cands = index.lookup("guakapli");
         assert!(guakapli_cands.iter().any(|c| c.hanzi == "我合你上好就到遮"));
+        let kiannkau_cands = index.lookup("kiannkau");
+        assert!(kiannkau_cands.iter().any(|c| c.hanzi == "行到淡水的海岸"));
     }
 
     #[test]
