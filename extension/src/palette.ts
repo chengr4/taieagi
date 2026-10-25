@@ -83,16 +83,15 @@ export class BackgroundBridge implements ComposerBridge {
   }
 
   public async cancel(): Promise<void> {
+    this.state.preedit = "";
+    this.state.candidates = [];
+    this.state.selected = 0;
+    this.state.hints = [];
     if (typeof chrome !== "undefined" && chrome?.runtime?.sendMessage) {
       const res = await chrome.runtime.sendMessage({ type: "CANCEL" });
       if (res?.ok) {
         this.updateState(res);
       }
-    } else {
-      this.state.preedit = "";
-      this.state.candidates = [];
-      this.state.selected = 0;
-      this.state.hints = [];
     }
   }
 
