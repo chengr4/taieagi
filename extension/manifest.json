@@ -40,9 +40,8 @@
     {
       "matches": [
         "*://*.facebook.com/*",
-        "*://*.threads.net/*",
+        "*://*.threads.com/*",
         "*://*.instagram.com/*",
-        "*://*.twitter.com/*",
         "*://*.x.com/*",
         "*://*.youtube.com/*",
         "*://*.dcard.tw/*",
