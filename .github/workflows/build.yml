@@ -124,15 +124,15 @@ jobs:
       - name: Upload package to Chrome Web Store API v2
         if: steps.version_gate.outputs.bumped == 'true'
         run: |
-          curl -sS -f -X POST \
+          curl -sS --fail-with-body -X POST \
             -H "Authorization: Bearer ${{ steps.auth.outputs.access_token }}" \
             -T taieagi-extension.zip \
-            "https://www.googleapis.com/upload/v2/publishers/${PUBLISHER_ID}/items/${ITEM_ID}:upload"
+            "https://chromewebstore.googleapis.com/upload/v2/publishers/${PUBLISHER_ID}/items/${ITEM_ID}:upload"
 
       - name: Submit package for review and publish
         if: steps.version_gate.outputs.bumped == 'true'
         run: |
-          curl -sS -f -X POST \
+          curl -sS --fail-with-body -X POST \
             -H "Authorization: Bearer ${{ steps.auth.outputs.access_token }}" \
             -H "Content-Type: application/json" \
             -d '{"publishType":"DEFAULT_PUBLISH"}' \
