@@ -1,4 +1,4 @@
-name: Build & Test Extension
+name: CI/CD Pipeline
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
@@ -64,3 +64,85 @@ jobs:
           name: taieagi-extension
           path: taieagi-extension.zip
           retention-days: 14
+
+  publish:
+    name: Publish to Chrome Web Store
+    needs: [build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: chrome-web-store
+
+    permissions:
+      contents: write
+      id-token: write
+
+    env:
+      WIF_PROVIDER: projects/444513479530/locations/global/workloadIdentityPools/github/providers/taieagi
+      SERVICE_ACCOUNT: cws-publisher@taieagi-release.iam.gserviceaccount.com
+      PUBLISHER_ID: c0766295-cbdb-4eea-b3a7-4651dc2dc140
+      ITEM_ID: ilabbgbeihaijflkelojidnnkecldakk
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Detect version and check tag existence
+        id: version_gate
+        run: |
+          VERSION=$(jq -r .version package.json)
+          TAG="v${VERSION}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            echo "bumped=false" >> "$GITHUB_OUTPUT"
+            echo "Tag ${TAG} already exists; skipping publication."
+          else
+            echo "bumped=true" >> "$GITHUB_OUTPUT"
+            echo "Tag ${TAG} does not exist; proceeding with publication."
+          fi
+
+      - name: Download extension artifact
+        if: steps.version_gate.outputs.bumped == 'true'
+        uses: actions/download-artifact@6b208ae046db98c579e8a3aa621ab581ff575935 # v4.1.1
+        with:
+          name: taieagi-extension
+          path: .
+
+      - name: Authenticate to Google Cloud via WIF
+        if: steps.version_gate.outputs.bumped == 'true'
+        id: auth
+        uses: google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193 # v2.1.10
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.SERVICE_ACCOUNT }}
+          token_format: "access_token"
+          access_token_scopes: "https://www.googleapis.com/auth/chromewebstore"
+          access_token_lifetime: "1800s"
+
+      - name: Upload package to Chrome Web Store API v2
+        if: steps.version_gate.outputs.bumped == 'true'
+        run: |
+          curl -sS -f -X POST \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.access_token }}" \
+            -T taieagi-extension.zip \
+            "https://www.googleapis.com/upload/v2/publishers/${PUBLISHER_ID}/items/${ITEM_ID}:upload"
+
+      - name: Submit package for review and publish
+        if: steps.version_gate.outputs.bumped == 'true'
+        run: |
+          curl -sS -f -X POST \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.access_token }}" \
+            -H "Content-Type: application/json" \
+            -d '{"publishType":"DEFAULT_PUBLISH"}' \
+            "https://chromewebstore.googleapis.com/v2/publishers/${PUBLISHER_ID}/items/${ITEM_ID}:publish"
+
+      - name: Create and push release tag
+        if: steps.version_gate.outputs.bumped == 'true'
+        run: |
+          TAG="${{ steps.version_gate.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
