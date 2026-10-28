@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Taieagi 臺灣本土語言快彈詞盤",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "R4 Cheng",
   "description": "社群留言臺灣本土語言正字快彈詞盤（現已支援臺灣閩南語臺羅拼音輸入）。",
   "action": {
@@ -38,9 +38,15 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "css": ["palette.css"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "palette.css"
+      ],
       "run_at": "document_idle"
     }
   ],
@@ -49,7 +55,9 @@
       "resources": [
         "pkg/taieagi_bg.wasm"
       ],
-      "matches": ["<all_urls>"]
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ]
 }
