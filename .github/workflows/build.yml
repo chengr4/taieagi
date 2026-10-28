@@ -130,7 +130,7 @@ jobs:
         env:
           ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
         run: |
-          curl -sS --fail-with-body -X POST \
+          curl -sS -f -X POST \
             -H "Authorization: Bearer $ACCESS_TOKEN" \
             -T taieagi-extension.zip \
             "https://chromewebstore.googleapis.com/upload/v2/publishers/${PUBLISHER_ID}/items/${ITEM_ID}:upload"
@@ -140,7 +140,7 @@ jobs:
         env:
           ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
         run: |
-          curl -sS --fail-with-body -X POST \
+          curl -sS -f -X POST \
             -H "Authorization: Bearer $ACCESS_TOKEN" \
             -H "Content-Type: application/json" \
             -d '{"publishType":"DEFAULT_PUBLISH"}' \
