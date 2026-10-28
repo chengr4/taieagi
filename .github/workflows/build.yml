@@ -92,6 +92,10 @@ jobs:
         id: version_gate
         run: |
           VERSION=$(jq -r .version package.json)
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: Invalid SemVer format in package.json: ${VERSION}" >&2
+            exit 1
+          fi
           TAG="v${VERSION}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
@@ -123,26 +127,31 @@ jobs:
 
       - name: Upload package to Chrome Web Store API v2
         if: steps.version_gate.outputs.bumped == 'true'
+        env:
+          ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
         run: |
           curl -sS --fail-with-body -X POST \
-            -H "Authorization: Bearer ${{ steps.auth.outputs.access_token }}" \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
             -T taieagi-extension.zip \
             "https://chromewebstore.googleapis.com/upload/v2/publishers/${PUBLISHER_ID}/items/${ITEM_ID}:upload"
 
       - name: Submit package for review and publish
         if: steps.version_gate.outputs.bumped == 'true'
+        env:
+          ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
         run: |
           curl -sS --fail-with-body -X POST \
-            -H "Authorization: Bearer ${{ steps.auth.outputs.access_token }}" \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
             -H "Content-Type: application/json" \
             -d '{"publishType":"DEFAULT_PUBLISH"}' \
             "https://chromewebstore.googleapis.com/v2/publishers/${PUBLISHER_ID}/items/${ITEM_ID}:publish"
 
       - name: Create and push release tag
         if: steps.version_gate.outputs.bumped == 'true'
+        env:
+          RELEASE_TAG: ${{ steps.version_gate.outputs.tag }}
         run: |
-          TAG="${{ steps.version_gate.outputs.tag }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG" -m "Release $TAG"
-          git push origin "$TAG"
+          git tag -a "$RELEASE_TAG" -m "Release $RELEASE_TAG"
+          git push origin "$RELEASE_TAG"
