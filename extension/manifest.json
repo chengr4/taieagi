@@ -39,7 +39,14 @@
   "content_scripts": [
     {
       "matches": [
-        "<all_urls>"
+        "*://*.facebook.com/*",
+        "*://*.threads.net/*",
+        "*://*.instagram.com/*",
+        "*://*.twitter.com/*",
+        "*://*.x.com/*",
+        "*://*.youtube.com/*",
+        "*://*.dcard.tw/*",
+        "*://*.ptt.cc/*"
       ],
       "js": [
         "content.js"
@@ -48,16 +55,6 @@
         "palette.css"
       ],
       "run_at": "document_idle"
-    }
-  ],
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "pkg/taieagi_bg.wasm"
-      ],
-      "matches": [
-        "<all_urls>"
-      ]
     }
   ]
 }
