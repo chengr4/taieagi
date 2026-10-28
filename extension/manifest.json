@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Taieagi 臺灣本土語言快彈詞盤",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "author": "R4 Cheng",
   "description": "社群留言臺灣本土語言正字快彈詞盤（現已支援臺灣閩南語臺羅拼音輸入）。",
   "action": {
