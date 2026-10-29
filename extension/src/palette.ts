@@ -29,7 +29,7 @@ export class BackgroundBridge implements ComposerBridge {
     selected: 0,
     hints: [],
   };
-  private currentMode: OutputMode = OutputMode.HanziOnly;
+  private currentMode: OutputMode = OutputMode.HanziWithMarks;
 
   public async init(onStateChange?: () => void): Promise<void> {
     if (typeof chrome !== "undefined" && chrome?.runtime?.sendMessage) {
@@ -161,9 +161,25 @@ export class Palette {
   private bridge: ComposerBridge;
   private currentTarget: HTMLElement | null = null;
   private visible = false;
+  private onOpenCallback: ((target: HTMLElement) => void) | null = null;
+  private onCloseCallback: (() => void) | null = null;
 
   constructor(bridge: ComposerBridge = new BackgroundBridge()) {
     this.bridge = bridge;
+  }
+
+  /**
+   * Registers a callback invoked whenever the palette opens on an interactive target element.
+   */
+  public setOnOpen(cb: (target: HTMLElement) => void): void {
+    this.onOpenCallback = cb;
+  }
+
+  /**
+   * Registers a callback invoked whenever the palette closes (via commit, Escape, or shortcut toggle).
+   */
+  public setOnClose(cb: () => void): void {
+    this.onCloseCallback = cb;
   }
 
   public async init(): Promise<void> {
@@ -210,6 +226,7 @@ export class Palette {
       this.container.style.display = "block";
     }
     this.render();
+    this.onOpenCallback?.(target);
   }
 
   public close(): void {
@@ -222,16 +239,17 @@ export class Palette {
       cancelRes.catch(() => {});
     }
     this.currentTarget = null;
+    this.onCloseCallback?.();
   }
 
   private cycleOutputMode(): void {
     const current = this.bridge.outputMode();
     const nextMode =
-      current === OutputMode.HanziOnly
-        ? OutputMode.HanziWithMarks
-        : current === OutputMode.HanziWithMarks
+      current === OutputMode.HanziWithMarks
         ? OutputMode.HanziWithNumber
-        : OutputMode.HanziOnly;
+        : current === OutputMode.HanziWithNumber
+        ? OutputMode.HanziOnly
+        : OutputMode.HanziWithMarks;
     const res = this.bridge.setOutputMode(nextMode);
     this.updateModeBadge();
     if (res instanceof Promise) {
@@ -250,11 +268,11 @@ export class Palette {
   private getModeBadgeLabel(): string {
     switch (this.bridge.outputMode()) {
       case OutputMode.HanziWithMarks:
+      default:
         return "[漢+調]";
       case OutputMode.HanziWithNumber:
         return "[漢+數]";
       case OutputMode.HanziOnly:
-      default:
         return "[純漢]";
     }
   }
@@ -291,7 +309,7 @@ export class Palette {
     const modeBadge = document.createElement("button");
     modeBadge.type = "button";
     modeBadge.className = "taieagi-mode-badge";
-    modeBadge.title = "切換輸出模式：純漢 - 漢+調 - 漢+數";
+    modeBadge.title = "切換輸出模式：漢+調 - 漢+數 - 純漢";
     modeBadge.textContent = this.getModeBadgeLabel();
     modeBadge.addEventListener("click", (e) => {
       e.preventDefault();

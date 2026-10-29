@@ -7,12 +7,12 @@ use crate::tone::{self, Tone};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[allow(clippy::enum_variant_names)]
 pub(crate) enum OutputMode {
-    /// Pure Hanzi (default), e.g. "水" / "啉水".
-    #[default]
+    /// Pure Hanzi, e.g. "水" / "啉水".
     HanziOnly,
     /// Hanzi followed by Tailo with tone numbers, e.g. "水 (tsui2)" / "啉水 (lim1-tsui2)".
     HanziWithNumber,
-    /// Hanzi followed by Tailo with diacritical marks, e.g. "水 (tsuí)" / "啉水 (lim-tsuí)".
+    /// Hanzi followed by Tailo with diacritical marks (default), e.g. "水 (tsuí)" / "啉水 (lim-tsuí)".
+    #[default]
     HanziWithMarks,
 }
 
@@ -315,7 +315,7 @@ mod tests {
     fn test_commit_index_returns_candidate_and_clears() {
         let mut e = composer();
         type_str(&mut e, "tsui");
-        assert_eq!(e.commit_index(1), Some("媠".to_string()));
+        assert_eq!(e.commit_index(1), Some("媠 (tsui\u{0301})".to_string()));
         assert_eq!(e.preedit(), "");
         assert!(e.candidates().is_empty());
         assert_eq!(e.selected(), 0);
@@ -553,7 +553,7 @@ mod tests {
         }
         type_str(&mut e, "tsite");
         assert_eq!(e.hints()[0].hanzi, "這个");
-        assert_eq!(e.commit_index(0), Some("這个".to_string()));
+        assert_eq!(e.commit_index(0), Some("這个 (tsit-e\u{0302})".to_string()));
         assert!(e.hints().is_empty());
     }
 
@@ -582,7 +582,7 @@ mod tests {
         assert_eq!(e.preedit(), "lim-tsui2");
 
         // Commit candidate clears buffer
-        assert_eq!(e.commit_index(0), Some("啉水".to_string()));
+        assert_eq!(e.commit_index(0), Some("啉水 (lim-tsui\u{0301})".to_string()));
         assert_eq!(e.preedit(), "");
     }
 }

@@ -39,13 +39,7 @@
   "content_scripts": [
     {
       "matches": [
-        "*://*.facebook.com/*",
-        "*://*.threads.com/*",
-        "*://*.instagram.com/*",
-        "*://*.x.com/*",
-        "*://*.youtube.com/*",
-        "*://*.dcard.tw/*",
-        "*://*.ptt.cc/*"
+        "<all_urls>"
       ],
       "js": [
         "content.js"

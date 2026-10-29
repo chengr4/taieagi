@@ -7,7 +7,7 @@ describe("Palette", () => {
     let candidatesList: string[] = [];
     let selectedIdx = 0;
     let hintsList: string[] = [];
-    let currentMode: OutputMode = OutputMode.HanziOnly;
+    let currentMode: OutputMode = OutputMode.HanziWithMarks;
 
     return {
       init: () => {},
@@ -73,6 +73,33 @@ describe("Palette", () => {
     palette.toggle(mockTarget);
     expect(palette.isOpen()).toBe(false);
     expect(palette.getTarget()).toBeNull();
+  });
+
+  it("notifies lifecycle listeners on open and close", () => {
+    const mockBridge = createMockBridge();
+    const palette = new Palette(mockBridge);
+    let openedTarget: HTMLElement | null = null;
+    let closedCount = 0;
+
+    palette.setOnOpen((target) => {
+      openedTarget = target;
+    });
+    palette.setOnClose(() => {
+      closedCount++;
+    });
+
+    const mockTarget = {
+      tagName: "TEXTAREA",
+      getBoundingClientRect: () => ({ top: 100, bottom: 130, left: 50, right: 250, width: 200, height: 30 }),
+      focus: () => {},
+    } as any;
+
+    palette.open(mockTarget);
+    expect(openedTarget).toBe(mockTarget);
+    expect(closedCount).toBe(0);
+
+    palette.close();
+    expect(closedCount).toBe(1);
   });
 
   it("handles keyboard events: typing letters, navigating candidates, and committing", () => {
@@ -397,23 +424,23 @@ describe("Palette", () => {
 
       const badge = createdElements.find((e) => e.className === "taieagi-mode-badge");
       expect(badge).toBeDefined();
-      expect(badge.textContent).toBe("[純漢]");
-      expect(mockBridge.outputMode()).toBe(OutputMode.HanziOnly);
-
-      // 1st click: HanziOnly -> HanziWithMarks
-      badge.click();
       expect(badge.textContent).toBe("[漢+調]");
       expect(mockBridge.outputMode()).toBe(OutputMode.HanziWithMarks);
 
-      // 2nd click: HanziWithMarks -> HanziWithNumber
+      // 1st click: HanziWithMarks -> HanziWithNumber
       badge.click();
       expect(badge.textContent).toBe("[漢+數]");
       expect(mockBridge.outputMode()).toBe(OutputMode.HanziWithNumber);
 
-      // 3rd click: HanziWithNumber -> HanziOnly
+      // 2nd click: HanziWithNumber -> HanziOnly
       badge.click();
       expect(badge.textContent).toBe("[純漢]");
       expect(mockBridge.outputMode()).toBe(OutputMode.HanziOnly);
+
+      // 3rd click: HanziOnly -> HanziWithMarks
+      badge.click();
+      expect(badge.textContent).toBe("[漢+調]");
+      expect(mockBridge.outputMode()).toBe(OutputMode.HanziWithMarks);
     } finally {
       delete (globalThis as any).document;
     }
@@ -531,7 +558,7 @@ describe("Palette", () => {
           }
           return {
             ok: true,
-            outputMode: OutputMode.HanziOnly,
+            outputMode: OutputMode.HanziWithMarks,
             preedit: "",
             candidates: [],
             selected: 0,
@@ -559,12 +586,12 @@ describe("Palette", () => {
       palette.open(mockTarget);
 
       const badge = createdElements.find((e) => e.className === "taieagi-mode-badge");
-      expect(badge.textContent).toBe("[純漢]");
+      expect(badge.textContent).toBe("[漢+調]");
 
       // Click badge to trigger SET_OUTPUT_MODE via real UI interaction
       badge.click();
-      expect(sentMessage).toEqual({ type: "SET_OUTPUT_MODE", mode: OutputMode.HanziWithMarks });
-      expect(badge.textContent).toBe("[漢+調]");
+      expect(sentMessage).toEqual({ type: "SET_OUTPUT_MODE", mode: OutputMode.HanziWithNumber });
+      expect(badge.textContent).toBe("[漢+數]");
 
       // Verify onChanged updates mode and badge text across tabs
       expect(storageListener).not.toBeNull();

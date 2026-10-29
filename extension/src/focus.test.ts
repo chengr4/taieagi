@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { FocusTracker, isEditableTarget, isTriggerShortcut } from "./focus";
+import {
+  FocusTracker,
+  isBadgeEnabledForHost,
+  isEditableTarget,
+  isTriggerShortcut,
+} from "./focus";
 
 describe("isEditableTarget", () => {
   it("recognizes standard textarea", () => {
@@ -86,3 +91,21 @@ describe("FocusTracker", () => {
     expect(tracker.getCurrent()).toBeNull();
   });
 });
+
+describe("isBadgeEnabledForHost", () => {
+  it("matches verified social networks and their subdomains", () => {
+    expect(isBadgeEnabledForHost("threads.com")).toBe(true);
+    expect(isBadgeEnabledForHost("www.threads.com")).toBe(true);
+    expect(isBadgeEnabledForHost("www.facebook.com")).toBe(true);
+    expect(isBadgeEnabledForHost("x.com")).toBe(true);
+    expect(isBadgeEnabledForHost("www.ptt.cc")).toBe(true);
+  });
+
+  it("rejects deprecated redirect domains and unlisted domains", () => {
+    expect(isBadgeEnabledForHost("twitter.com")).toBe(false);
+    expect(isBadgeEnabledForHost("threads.net")).toBe(false);
+    expect(isBadgeEnabledForHost("github.com")).toBe(false);
+    expect(isBadgeEnabledForHost("google.com")).toBe(false);
+  });
+});
+

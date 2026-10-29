@@ -83,9 +83,10 @@ impl WasmComposer {
     /// - 2: HanziWithMarks
     pub fn set_output_mode(&mut self, mode: u8) {
         let mode = match mode {
+            0 => OutputMode::HanziOnly,
             1 => OutputMode::HanziWithNumber,
             2 => OutputMode::HanziWithMarks,
-            _ => OutputMode::HanziOnly,
+            _ => OutputMode::default(),
         };
         self.inner.set_output_mode(mode);
     }
@@ -131,8 +132,11 @@ mod tests {
         assert!(wc.move_selection(1));
         assert_eq!(wc.selected(), 1);
 
-        // Commit candidate (HanziOnly default)
-        assert_eq!(wc.commit_index(wc.selected()), Some(cands[1].clone()));
+        // Commit candidate (HanziWithMarks default)
+        assert_eq!(
+            wc.commit_index(wc.selected()),
+            Some(format!("{} (tsui\u{0302})", cands[1]))
+        );
         assert_eq!(wc.preedit(), "");
         assert!(wc.candidates().is_empty());
     }

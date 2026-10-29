@@ -28,13 +28,15 @@ async function main() {
     throw new Error(`Expected candidates to include '水', got: ${JSON.stringify(cands)}`);
   }
 
-  // Test commit index
+  // Test commit index and verify domain invariant (starts with selected candidate)
+  const selectedCand = cands[composer.selected()];
   const committedText = composer.commit_index(composer.selected());
   console.log("Committed text:", committedText);
-  if (committedText !== cands[0]) {
-    throw new Error(`Expected '${cands[0]}', got '${committedText}'`);
+  if (!committedText || !committedText.startsWith(selectedCand)) {
+    throw new Error(`Expected commit starting with '${selectedCand}', got '${committedText}'`);
   }
 
+  // Verify invariant: preedit buffer must be cleared after commit
   if (composer.preedit() !== "") {
     throw new Error("Preedit should be cleared after commit");
   }

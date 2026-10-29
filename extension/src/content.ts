@@ -1,4 +1,9 @@
-import { FocusTracker, isEditableTarget, isTriggerShortcut } from "./focus";
+import {
+  FocusTracker,
+  isBadgeEnabledForHost,
+  isEditableTarget,
+  isTriggerShortcut,
+} from "./focus";
 import { Palette } from "./palette";
 
 class ExtensionController {
@@ -9,6 +14,21 @@ class ExtensionController {
 
   public init(): void {
     this.createBadge();
+
+    // Synchronize palette lifecycle with floating badge visibility:
+    // Opening the palette reveals the badge across all sites.
+    this.palette.setOnOpen((target) => {
+      this.showBadge(target);
+    });
+
+    // Closing the palette hides the badge on unlisted sites (non-social platforms),
+    // keeping the badge persistently visible only on whitelisted social platforms.
+    this.palette.setOnClose(() => {
+      if (!isBadgeEnabledForHost(window.location.hostname)) {
+        this.hideBadge();
+      }
+    });
+
     this.bindEvents();
     this.palette.init().catch((err) => {
       console.error("[Taieagi] Failed to pre-initialize WASM palette:", err);
@@ -59,7 +79,10 @@ class ExtensionController {
             this.hideBadgeTimer = null;
           }
           this.focusTracker.onFocus(target);
-          this.showBadge(target as HTMLElement);
+          // Show the floating badge automatically on focus only for whitelisted social platforms
+          if (isBadgeEnabledForHost(window.location.hostname)) {
+            this.showBadge(target as HTMLElement);
+          }
         }
       },
       true

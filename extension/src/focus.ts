@@ -99,3 +99,27 @@ export class FocusTracker {
     return this.currentEditable;
   }
 }
+
+/**
+ * Designated social platforms and forums where the floating language badge appears on focus.
+ */
+export const BADGE_ENABLED_HOSTS = [
+  "facebook.com",
+  "threads.com",
+  "instagram.com",
+  "x.com",
+  "youtube.com",
+  "dcard.tw",
+  "ptt.cc",
+];
+
+/**
+ * Checks whether the floating language badge should automatically appear for the given hostname.
+ */
+export function isBadgeEnabledForHost(hostname: string): boolean {
+  const lower = hostname.toLowerCase();
+  return BADGE_ENABLED_HOSTS.some(
+    (domain) => lower === domain || lower.endsWith(`.${domain}`)
+  );
+}
+
