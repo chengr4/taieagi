@@ -4,6 +4,10 @@
 
 A lightweight, efficient Chrome extension providing a 26-key Quick Palette for Taiwanese indigenous and native languages without disturbing standard OS input methods.  
 
+<p align="center">
+  <img src="assets/demo.gif" alt="Taieagi Quick Palette Demo" width="526" />
+</p>
+
 ## 專案定位與願景 (Vision & Architecture)
 
 **Taieagi** 致力於為臺灣所有非華語之本土語言（臺灣閩南語、臺灣客語、臺灣原住民族各語）打造統一、現代且零干擾的 26 鍵輸入體驗。核心場景鎖定於社交平台（Threads、Facebook、Dcard、X 等）留言或即時通訊中快速鍵入正字與標調拼音。
