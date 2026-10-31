@@ -303,6 +303,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if plain_tailo.is_empty() {
                 continue;
             }
+            let dedup_key = format!("{}\t{}", plain_tailo, hanzi);
+            if !seen.contains(&dedup_key) {
+                return Err(format!(
+                    "Hint entry ({}, {}) in {} does not match any definition in primary lexicon",
+                    hanzi,
+                    fields[1].trim(),
+                    hints_path_str
+                )
+                .into());
+            }
             let candidate = Candidate {
                 hanzi: hanzi.to_string(),
                 tailo: plain_tailo,

@@ -159,7 +159,18 @@ mod tests {
         }
         assert_eq!(
             wc.commit_index(0),
-            Some("啉水 (lim-tsui\u{0301})".to_string())
+            Some("啉水 (lim tsui\u{0301})".to_string())
+        );
+
+        for c in "lituigua".chars() {
+            wc.push_char(c);
+        }
+        assert_eq!(
+            wc.commit_index(0),
+            Some(
+                "你對我已經無感覺 (li\u{0301} tui\u{0300} gua\u{0301} i\u{0301}-king bo\u{0302} ka\u{0301}m-kak)"
+                    .to_string()
+            )
         );
     }
 

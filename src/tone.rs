@@ -393,29 +393,33 @@ fn parse_tailo_syllable(syllable: &str) -> (String, Tone) {
 }
 
 /// Parses a full hyphenated, spaced, or compound Tâi-lô word/phrase into standardized
-/// hyphenated plain letters and a sequence of [`Tone`]s.
+/// plain letters (preserving spaces between words and hyphens between syllables)
+/// and a sequence of [`Tone`]s.
 pub fn parse_tailo_word(word: &str) -> (String, Vec<Tone>) {
-    let mut plain_syllables = Vec::new();
+    let mut plain_words = Vec::new();
     let mut tones = Vec::new();
 
-    // Normalize neutral tone marker '--' to standard hyphen '-'
-    let normalized = word.replace("--", "-");
+    // Split on whitespace to preserve word boundaries, then on '-' for syllables within a word
+    for word_part in word.split_whitespace() {
+        let mut plain_syllables = Vec::new();
+        for part in word_part.split('-') {
+            let trimmed = part.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
 
-    // Split on hyphens or spaces
-    for part in normalized.split(['-', ' ']) {
-        let trimmed = part.trim();
-        if trimmed.is_empty() {
-            continue;
+            let (plain, tone) = parse_tailo_syllable(trimmed);
+            if !plain.is_empty() {
+                plain_syllables.push(plain);
+                tones.push(tone);
+            }
         }
-
-        let (plain, tone) = parse_tailo_syllable(trimmed);
-        if !plain.is_empty() {
-            plain_syllables.push(plain);
-            tones.push(tone);
+        if !plain_syllables.is_empty() {
+            plain_words.push(plain_syllables.join("-"));
         }
     }
 
-    (plain_syllables.join("-"), tones)
+    (plain_words.join(" "), tones)
 }
 
 #[cfg(test)]
@@ -678,10 +682,26 @@ mod tests {
             vec![Tone::Tone4, Tone::Tone1, Tone::Tone2, Tone::Tone7]
         );
 
-        // Multi-syllable compound with spaces
+        // Multi-word phrase preserving spaces between words and hyphens within words
         let (plain, tones) = parse_tailo_word("tsi̍t gue̍h-ji̍t");
-        assert_eq!(plain, "tsit-gueh-jit");
+        assert_eq!(plain, "tsit gueh-jit");
         assert_eq!(tones, vec![Tone::Tone8, Tone::Tone8, Tone::Tone8]);
+
+        let (plain, tones) = parse_tailo_word("Lí tuì guá í-king bô kám-kak");
+        assert_eq!(plain, "li tui gua i-king bo kam-kak");
+        assert_eq!(
+            tones,
+            vec![
+                Tone::Tone2,
+                Tone::Tone3,
+                Tone::Tone2,
+                Tone::Tone2,
+                Tone::Tone1,
+                Tone::Tone5,
+                Tone::Tone2,
+                Tone::Tone4,
+            ]
+        );
 
         // Neutral tone prefix '--'
         let (plain, tones) = parse_tailo_word("kú--lâi");

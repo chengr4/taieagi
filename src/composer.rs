@@ -25,31 +25,37 @@ pub(crate) fn format_commit(candidate: &Candidate, mode: OutputMode) -> String {
         return candidate.hanzi.clone();
     }
 
-    let syllables: Vec<&str> = candidate
+    let words: Vec<Vec<&str>> = candidate
         .tailo
-        .split(|c: char| c == '-' || c.is_ascii_whitespace())
-        .filter(|s| !s.is_empty())
+        .split_whitespace()
+        .map(|w| w.split('-').filter(|s| !s.is_empty()).collect::<Vec<_>>())
+        .filter(|w| !w.is_empty())
         .collect();
 
-    if syllables.is_empty() || syllables.len() != candidate.tones.len() {
+    let total_syllables: usize = words.iter().map(Vec::len).sum();
+    if total_syllables == 0 || total_syllables != candidate.tones.len() {
         return candidate.hanzi.clone();
     }
 
-    let formatted_tailo = match mode {
-        OutputMode::HanziOnly => unreachable!(),
-        OutputMode::HanziWithNumber => syllables
-            .iter()
-            .zip(&candidate.tones)
-            .map(|(syl, tone)| format!("{syl}{}", tone.number()))
-            .collect::<Vec<_>>()
-            .join("-"),
-        OutputMode::HanziWithMarks => syllables
-            .iter()
-            .zip(&candidate.tones)
-            .map(|(syl, tone)| tone::apply_tone(syl, *tone))
-            .collect::<Vec<_>>()
-            .join("-"),
-    };
+    let mut tones = candidate.tones.iter();
+    let formatted_tailo = words
+        .into_iter()
+        .map(|syllables| {
+            syllables
+                .into_iter()
+                .map(|syl| {
+                    let tone = tones.next().expect("checked syllable count matches tones");
+                    match mode {
+                        OutputMode::HanziOnly => unreachable!(),
+                        OutputMode::HanziWithNumber => format!("{syl}{}", tone.number()),
+                        OutputMode::HanziWithMarks => tone::apply_tone(syl, *tone),
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("-")
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
 
     format!("{} ({})", candidate.hanzi, formatted_tailo)
 }
@@ -386,15 +392,24 @@ mod tests {
             "啉水 (lim1-tsui2)"
         );
 
-        // Also supports whitespace-separated lexicon data
-        let space_compound = Candidate {
-            hanzi: "啉水".to_string(),
-            tailo: "lim tsui".to_string(),
-            tones: vec![Tone::Tone1, Tone::Tone2],
+        // Preserves word spaces and intra-word hyphens
+        let multi_word = Candidate {
+            hanzi: "你對我已經無感覺".to_string(),
+            tailo: "li tui gua i-king bo kam-kak".to_string(),
+            tones: vec![
+                Tone::Tone2,
+                Tone::Tone3,
+                Tone::Tone2,
+                Tone::Tone2,
+                Tone::Tone1,
+                Tone::Tone5,
+                Tone::Tone2,
+                Tone::Tone4,
+            ],
         };
         assert_eq!(
-            format_commit(&space_compound, OutputMode::HanziWithNumber),
-            "啉水 (lim1-tsui2)"
+            format_commit(&multi_word, OutputMode::HanziWithNumber),
+            "你對我已經無感覺 (li2 tui3 gua2 i2-king1 bo5 kam2-kak4)"
         );
     }
 
@@ -420,6 +435,25 @@ mod tests {
         assert_eq!(
             format_commit(&compound, OutputMode::HanziWithMarks),
             "啉水 (lim-tsui\u{0301})"
+        );
+
+        let multi_word = Candidate {
+            hanzi: "你對我已經無感覺".to_string(),
+            tailo: "li tui gua i-king bo kam-kak".to_string(),
+            tones: vec![
+                Tone::Tone2,
+                Tone::Tone3,
+                Tone::Tone2,
+                Tone::Tone2,
+                Tone::Tone1,
+                Tone::Tone5,
+                Tone::Tone2,
+                Tone::Tone4,
+            ],
+        };
+        assert_eq!(
+            format_commit(&multi_word, OutputMode::HanziWithMarks),
+            "你對我已經無感覺 (li\u{0301} tui\u{0300} gua\u{0301} i\u{0301}-king bo\u{0302} ka\u{0301}m-kak)"
         );
     }
 
