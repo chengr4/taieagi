@@ -75,6 +75,17 @@ pub(crate) struct TailoIndex {
     hints_root: TrieNode<Candidate>,
 }
 
+/// Relevance tier of a lexicon entry relative to the typed query, ordered from highest to lowest priority.
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+enum MatchTier {
+    /// Exact full-key match (e.g. `"san"` -> `"san"`).
+    Exact,
+    /// Single-`'n'` query matched a nasalized `"nn"` key (e.g. `"siunham"` -> `"siunn-ham"`).
+    Nasalized,
+    /// Longer compound word sharing the query as a prefix.
+    Prefix,
+}
+
 /// Normalizes a romanization into a trie key: lowercase letters only,
 /// with hyphens and tone digits removed.
 fn normalize(tailo: &str) -> String {
@@ -167,6 +178,30 @@ impl TailoIndex {
             .collect()
     }
 
+    /// Walks the lexicon trie for `key`, allowing `'n'` to also traverse a
+    /// nasalized `"nn"` branch.
+    fn walk_lexicon(&self, key: &str) -> Vec<(&TrieNode<LexiconEntry>, MatchTier)> {
+        let mut frontier = vec![(&self.lexicon_root, MatchTier::Exact)];
+        for c in key.chars() {
+            let mut next_frontier = Vec::new();
+            for (node, tier) in frontier {
+                if let Some(next) = node.children.get(&c) {
+                    next_frontier.push((next, tier));
+                    if c == 'n'
+                        && let Some(nn_next) = next.children.get(&'n')
+                    {
+                        next_frontier.push((nn_next, MatchTier::Nasalized));
+                    }
+                }
+            }
+            if next_frontier.is_empty() {
+                return Vec::new();
+            }
+            frontier = next_frontier;
+        }
+        frontier
+    }
+
     /// Looks up candidates by typed input, prioritizing exact matches over prefix
     /// extensions, sorted by weight (descending), and deduplicated by hanzi.
     ///
@@ -187,37 +222,31 @@ impl TailoIndex {
             return Vec::new();
         }
 
-        let mut node = &self.lexicon_root;
-        for c in key.chars() {
-            match node.children.get(&c) {
-                Some(next) => node = next,
-                None => return Vec::new(),
-            }
-        }
-
-        let mut matched: Vec<(&LexiconEntry, bool)> = Vec::new();
-        match tone {
-            Some(t) => matched.extend(
-                node.entries
-                    .iter()
-                    .filter(|e| e.tones.last() == Some(&t))
-                    .map(|e| (e, true)),
-            ),
-            None => {
-                matched.extend(node.entries.iter().map(|e| (e, true)));
-                let mut prefix_entries = Vec::new();
-                for child in node.children.values() {
-                    child.collect_into(&mut prefix_entries);
+        let mut matched: Vec<(&LexiconEntry, MatchTier)> = Vec::new();
+        for (node, tier) in self.walk_lexicon(&key) {
+            match tone {
+                Some(t) => matched.extend(
+                    node.entries
+                        .iter()
+                        .filter(|e| e.tones.last() == Some(&t))
+                        .map(|e| (e, tier)),
+                ),
+                None => {
+                    matched.extend(node.entries.iter().map(|e| (e, tier)));
+                    let mut prefix_entries = Vec::new();
+                    for child in node.children.values() {
+                        child.collect_into(&mut prefix_entries);
+                    }
+                    matched.extend(prefix_entries.into_iter().map(|e| (e, MatchTier::Prefix)));
                 }
-                matched.extend(prefix_entries.into_iter().map(|e| (e, false)));
             }
         }
 
-        // Exact key matches rank before prefix extensions; tie-break by weight (desc),
-        // then fewer syllables, shorter hanzi, and finally hanzi codepoint order.
-        matched.sort_by(|(a, a_exact), (b, b_exact)| {
-            b_exact
-                .cmp(a_exact)
+        // Exact matches rank before fuzzy 'nn' matches, which rank before prefix extensions;
+        // tie-break by weight (desc), fewer syllables, shorter hanzi, and codepoint order.
+        matched.sort_by(|(a, a_tier), (b, b_tier)| {
+            a_tier
+                .cmp(b_tier)
                 .then_with(|| b.weight.cmp(&a.weight))
                 .then_with(|| a.tones.len().cmp(&b.tones.len()))
                 .then_with(|| a.hanzi.len().cmp(&b.hanzi.len()))
@@ -646,6 +675,9 @@ mod tests {
         assert!(guakapli_cands.iter().any(|c| c.hanzi == "我合你上好就到遮"));
         let kiannkau_cands = index.lookup("kiannkau");
         assert!(kiannkau_cands.iter().any(|c| c.hanzi == "行到淡水的海岸"));
+
+        let siunham_cands = index.lookup("siunham");
+        assert!(siunham_cands.iter().any(|c| c.hanzi == "傷譀"));
     }
 
     #[test]
@@ -686,5 +718,28 @@ mod tests {
         // Consecutive hyphens or lone hyphens return empty
         assert!(idx.lookup("---").is_empty());
         assert!(idx.lookup("-").is_empty());
+    }
+
+    #[test]
+    fn test_lookup_single_n_matches_nasalized_nn_after_exact_matches() {
+        let mut idx = TailoIndex::default();
+        idx.insert(entry("san", "山", 10, &[Tone::Tone1]));
+        idx.insert(entry("sann", "三", 100, &[Tone::Tone1]));
+        idx.insert(entry("san-tsui", "山水", 95, &[Tone::Tone1, Tone::Tone2]));
+        idx.insert(entry("sann-khoo", "衫褲", 90, &[Tone::Tone1, Tone::Tone3]));
+        idx.insert(entry("siunn-ham", "傷譀", 100, &[Tone::Tone1, Tone::Tone3]));
+
+        // Exact ("山") > fuzzy 'nn' ("三") > prefix extensions by weight ("山水", "衫褲")
+        assert_eq!(
+            hanzi_of(&idx.lookup("san")),
+            vec!["山", "三", "山水", "衫褲"]
+        );
+
+        // Single 'n' in compound input matches 'nn' entry directly
+        assert_eq!(hanzi_of(&idx.lookup("siunham")), vec!["傷譀"]);
+        assert_eq!(hanzi_of(&idx.lookup("siun-ham3")), vec!["傷譀"]);
+
+        // Explicit 'nn' only matches 'nn' entries
+        assert_eq!(hanzi_of(&idx.lookup("sann")), vec!["三", "衫褲"]);
     }
 }
